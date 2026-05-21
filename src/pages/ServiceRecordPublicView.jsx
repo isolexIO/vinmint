@@ -3,7 +3,7 @@ import { ServiceRecord } from '@/entities/ServiceRecord';
 import { Vehicle } from '@/entities/Vehicle';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Car, Wrench, Shield, FileText, MapPin, DollarSign, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Car, Calendar, Wrench, Shield, Star, FileText, MapPin, DollarSign, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 const ServiceRecordPublicView = () => {

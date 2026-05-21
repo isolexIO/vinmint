@@ -10,13 +10,17 @@ import { getSolanaStats } from "@/functions/getSolanaStats";
 import { 
   Car, 
   Shield, 
+  Search, 
+  Zap, 
   Globe, 
   CheckCircle,
   ArrowRight,
+  Sparkles,
   Lock,
   Database,
   LogIn,
-  Building // Added PlusCircle import
+  Building,
+  PlusCircle // Added PlusCircle import
 } from "lucide-react";
 import { motion } from "framer-motion";
 

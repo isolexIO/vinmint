@@ -22,10 +22,13 @@ import {
   DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Store,
   Plus,
   Wrench,
+  Calendar,
+  DollarSign,
   Star,
   Search,
   Shield,
@@ -33,6 +36,7 @@ import {
   AlertTriangle,
   Car,
   Loader2,
+  Clock,
   Wallet,
   User as UserIcon,
   ExternalLink // Imported for the explorer link

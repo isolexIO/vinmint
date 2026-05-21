@@ -16,6 +16,7 @@ import {
   CheckCircle, 
   AlertTriangle, 
   Loader2,
+  X,
   DollarSign
 } from "lucide-react";
 import { UploadFile } from '@/integrations/Core';

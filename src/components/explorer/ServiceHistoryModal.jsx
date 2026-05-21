@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Car,
   Calendar,
+  MapPin,
   User,
   Wrench,
   DollarSign,

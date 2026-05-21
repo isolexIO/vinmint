@@ -4,6 +4,7 @@ import { Bell, X, Zap, Gift, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Notification } from '@/entities/Notification';
+import { createPageUrl } from '@/utils';
 
 const NotificationIcon = ({ type }) => {
     switch (type) {

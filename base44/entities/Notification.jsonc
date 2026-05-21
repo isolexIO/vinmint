@@ -1,0 +1,46 @@
+{
+  "name": "Notification",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "The ID of the user who receives the notification."
+    },
+    "message": {
+      "type": "string",
+      "description": "The content of the notification message."
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "transaction",
+        "nft_mint",
+        "reward",
+        "system"
+      ],
+      "description": "The category of the notification."
+    },
+    "is_read": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the user has read the notification."
+    },
+    "link_to": {
+      "type": "string",
+      "description": "An optional URL link related to the notification (e.g., to a wallet or transaction page)."
+    }
+  },
+  "required": [
+    "user_id",
+    "message",
+    "type"
+  ],
+  "rls": {
+    "read": {
+      "user_id": "{{user.id}}"
+    },
+    "write": {
+      "user_id": "{{user.id}}"
+    }
+  }
+}

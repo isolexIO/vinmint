@@ -1,0 +1,51 @@
+{
+  "name": "RewardSettings",
+  "type": "object",
+  "properties": {
+    "reward_type": {
+      "type": "string",
+      "enum": [
+        "referral",
+        "registration",
+        "service_completion",
+        "loyalty",
+        "admin_bonus"
+      ],
+      "description": "Type of reward"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Default amount of $VIN tokens for this reward type"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this reward type is currently active"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the reward"
+    },
+    "conditions": {
+      "type": "object",
+      "description": "JSON object defining conditions for automatic reward triggers"
+    }
+  },
+  "required": [
+    "reward_type",
+    "amount",
+    "description"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

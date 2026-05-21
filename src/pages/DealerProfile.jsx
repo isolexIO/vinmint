@@ -4,7 +4,7 @@ import { User } from '@/entities/User';
 import { Vehicle } from '@/entities/Vehicle';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Building, MapPin, Phone, Mail, CheckCircle, Car, ExternalLink } from 'lucide-react';
+import { Building, MapPin, Phone, Mail, CheckCircle, Car, Loader2, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';

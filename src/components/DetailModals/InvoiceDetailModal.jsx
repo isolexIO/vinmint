@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, User, Shield, Copy, Share2, X, ExternalLink, Download, Loader2 } from "lucide-react";
+import { FileText, Calendar, DollarSign, User, Shield, Copy, Share2, X, ExternalLink, Download, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { createPageUrl } from '@/utils';
 import { exportInvoiceToPdf } from '@/functions/exportInvoiceToPdf';

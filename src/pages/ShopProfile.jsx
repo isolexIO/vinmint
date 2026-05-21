@@ -4,7 +4,7 @@ import { CertifiedShop } from '@/entities/CertifiedShop';
 import { ServiceRecord } from '@/entities/ServiceRecord';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Store, MapPin, Phone, Mail, CheckCircle, Wrench } from 'lucide-react';
+import { Store, MapPin, Phone, Mail, CheckCircle, Wrench, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function ShopProfile() {

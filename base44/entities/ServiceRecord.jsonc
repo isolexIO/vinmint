@@ -1,0 +1,138 @@
+{
+  "name": "ServiceRecord",
+  "type": "object",
+  "properties": {
+    "vehicle_id": {
+      "type": "string",
+      "description": "Reference to the vehicle entity ID"
+    },
+    "vin": {
+      "type": "string",
+      "description": "Vehicle VIN for quick reference"
+    },
+    "shop_id": {
+      "type": "string",
+      "description": "Reference to the certified shop"
+    },
+    "shop_name": {
+      "type": "string",
+      "description": "Name of the service shop"
+    },
+    "service_type": {
+      "type": "string",
+      "enum": [
+        "oil_change",
+        "brake_repair",
+        "tire_replacement",
+        "engine_repair",
+        "transmission",
+        "inspection",
+        "maintenance",
+        "accident_repair",
+        "other"
+      ],
+      "description": "Type of service performed"
+    },
+    "service_details": {
+      "type": "string",
+      "description": "Detailed description of work performed"
+    },
+    "parts_replaced": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of parts replaced during service"
+    },
+    "cost": {
+      "type": "number",
+      "description": "Cost of service"
+    },
+    "mileage_at_service": {
+      "type": "integer",
+      "description": "Vehicle mileage at time of service"
+    },
+    "mechanic_signature": {
+      "type": "string",
+      "description": "Digital signature of the mechanic"
+    },
+    "nft_chain": {
+      "type": "string",
+      "description": "The blockchain the NFT was minted on (e.g., Solana)"
+    },
+    "nft_token_id": {
+      "type": "string",
+      "description": "The unique token ID of the service record NFT"
+    },
+    "nft_tx_hash": {
+      "type": "string",
+      "description": "The transaction hash of the NFT mint"
+    },
+    "nft_minted_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date and time when the NFT was minted"
+    },
+    "nft_recipient": {
+      "type": "string",
+      "description": "The wallet address that received the NFT"
+    },
+    "nft_metadata": {
+      "type": "object",
+      "description": "The metadata object stored with the NFT"
+    },
+    "warranty_months": {
+      "type": "integer",
+      "description": "Warranty period in months"
+    },
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Before/after photos"
+    },
+    "invoice_id": {
+      "type": "string",
+      "description": "Reference to the NFT minting invoice"
+    }
+  },
+  "required": [
+    "vehicle_id",
+    "vin",
+    "shop_id",
+    "shop_name",
+    "service_type",
+    "service_details",
+    "mileage_at_service"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "shop_id": "{{user.shop_id}}"
+        },
+        {
+          "nft_recipient": "{{user.wallet_address}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "write": {
+      "$or": [
+        {
+          "shop_id": "{{user.shop_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

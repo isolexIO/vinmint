@@ -1,0 +1,110 @@
+{
+  "name": "Vehicle",
+  "type": "object",
+  "properties": {
+    "vin": {
+      "type": "string",
+      "description": "Vehicle Identification Number"
+    },
+    "domain": {
+      "type": "string",
+      "description": "Solana-based .VINmint domain (e.g., 1HGCM82633A123456.VINmint)"
+    },
+    "make": {
+      "type": "string",
+      "description": "Vehicle make"
+    },
+    "model": {
+      "type": "string",
+      "description": "Vehicle model"
+    },
+    "year": {
+      "type": "integer",
+      "description": "Vehicle year"
+    },
+    "color": {
+      "type": "string",
+      "description": "Vehicle color"
+    },
+    "owner_wallet": {
+      "type": "string",
+      "description": "Current owner's Solana wallet address"
+    },
+    "dealer_id": {
+      "type": "string",
+      "description": "Reference to the dealer user ID if owned by a dealership"
+    },
+    "previous_owners": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of previous owner wallet addresses"
+    },
+    "domain_nft_token_id": {
+      "type": "string",
+      "description": "NFT certificate token ID for the Solana domain"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "Vehicle image URL"
+    },
+    "mileage": {
+      "type": "integer",
+      "description": "Current mileage"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "transferred",
+        "disputed"
+      ],
+      "default": "active"
+    },
+    "invoice_id": {
+      "type": "string",
+      "description": "Reference to the registration invoice"
+    }
+  },
+  "required": [
+    "vin",
+    "domain",
+    "make",
+    "model",
+    "year",
+    "owner_wallet"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "data.owner_wallet": "{{user.data.wallet_address}}"
+        },
+        {
+          "data.dealer_id": "{{user.data.business_domain}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "write": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

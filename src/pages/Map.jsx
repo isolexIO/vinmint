@@ -10,6 +10,7 @@ import { User } from '@/entities/User';
 import { Store, Building, MapPin, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { getSolanaStats } from '@/functions/getSolanaStats';
 
 // Custom SVG Icon for Shops
 const shopIcon = new L.Icon({

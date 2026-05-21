@@ -1,0 +1,110 @@
+{
+  "name": "Invoice",
+  "type": "object",
+  "properties": {
+    "customer_id": {
+      "type": "string",
+      "description": "User ID of the customer"
+    },
+    "customer_email": {
+      "type": "string",
+      "description": "Customer email for record keeping"
+    },
+    "invoice_number": {
+      "type": "string",
+      "description": "Unique invoice number (e.g., INV-2024-0001)"
+    },
+    "invoice_type": {
+      "type": "string",
+      "enum": [
+        "vin_registration",
+        "service_nft",
+        "transfer_fee",
+        "business_registration"
+      ],
+      "description": "Type of service invoiced"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the service"
+    },
+    "item_reference": {
+      "type": "string",
+      "description": "Reference to the VIN, service record ID, business domain, etc."
+    },
+    "amount_vin": {
+      "type": "number",
+      "description": "Amount charged in VIN tokens"
+    },
+    "amount_usd": {
+      "type": "number",
+      "description": "USD equivalent at time of payment"
+    },
+    "discount_applied": {
+      "type": "number",
+      "default": 0,
+      "description": "Discount percentage applied (0-1)"
+    },
+    "final_amount_vin": {
+      "type": "number",
+      "description": "Final amount after discount in VIN tokens"
+    },
+    "payment_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "paid",
+        "failed",
+        "refunded"
+      ],
+      "default": "pending"
+    },
+    "payment_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When payment was processed"
+    },
+    "transaction_hash": {
+      "type": "string",
+      "description": "Blockchain transaction hash for payment"
+    },
+    "customer_type": {
+      "type": "string",
+      "enum": [
+        "vehicle_owner",
+        "dealer",
+        "shop_owner"
+      ],
+      "description": "Type of customer for analytics"
+    }
+  },
+  "required": [
+    "customer_id",
+    "customer_email",
+    "invoice_number",
+    "invoice_type",
+    "description",
+    "amount_vin",
+    "amount_usd",
+    "final_amount_vin"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "customer_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "name": "Invite",
+  "type": "object",
+  "properties": {
+    "token": {
+      "type": "string",
+      "description": "Unique, single-use invitation token"
+    },
+    "user_type": {
+      "type": "string",
+      "enum": [
+        "shop_owner",
+        "dealer"
+      ],
+      "description": "The type of user this invite is for"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "accepted"
+      ],
+      "default": "pending",
+      "description": "Status of the invitation"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date and time when the token becomes invalid"
+    },
+    "accepted_by_user_id": {
+      "type": "string",
+      "description": "The user ID of the person who accepted the invite"
+    },
+    "accepted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date and time when the invite was accepted"
+    }
+  },
+  "required": [
+    "token",
+    "user_type",
+    "expires_at"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

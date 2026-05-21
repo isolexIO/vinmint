@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Invoice } from '@/entities/Invoice';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, User, Shield, Loader2 } from 'lucide-react';
+import { FileText, Calendar, DollarSign, User, Shield, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 const VinTokenLogoSmall = () => (

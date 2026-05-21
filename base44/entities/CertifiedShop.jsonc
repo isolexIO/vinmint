@@ -1,0 +1,146 @@
+{
+  "name": "CertifiedShop",
+  "type": "object",
+  "properties": {
+    "shop_name": {
+      "type": "string",
+      "description": "Official business name"
+    },
+    "business_domain": {
+      "type": "string",
+      "description": "Business .VINmint domain (e.g., AutoCare.VINmint)"
+    },
+    "domain_nft_token_id": {
+      "type": "string",
+      "description": "NFT certificate token ID for the business domain"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "Shop logo image URL"
+    },
+    "wallet_address": {
+      "type": "string",
+      "description": "Shop's Solana wallet address"
+    },
+    "certification_id": {
+      "type": "string",
+      "description": "VINmint certification identifier"
+    },
+    "business_license": {
+      "type": "string",
+      "description": "Business license number"
+    },
+    "address": {
+      "type": "string",
+      "description": "Physical address"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Contact phone number"
+    },
+    "email": {
+      "type": "string",
+      "description": "Contact email"
+    },
+    "specialties": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "general_repair",
+          "engine_specialist",
+          "transmission",
+          "brake_specialist",
+          "electrical",
+          "body_work",
+          "tire_service",
+          "oil_change",
+          "inspection"
+        ]
+      },
+      "description": "Shop specialties"
+    },
+    "offered_services": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "A list of specific services offered by the shop"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "suspended",
+        "revoked"
+      ],
+      "default": "pending"
+    },
+    "verification_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of certification approval"
+    },
+    "rating": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "Average customer rating"
+    },
+    "total_services": {
+      "type": "integer",
+      "default": 0,
+      "description": "Total number of service records issued"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude for map location"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude for map location"
+    },
+    "registration_invoice_id": {
+      "type": "string",
+      "description": "Reference to the business registration invoice"
+    }
+  },
+  "required": [
+    "shop_name",
+    "wallet_address",
+    "business_license",
+    "address",
+    "phone",
+    "email"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "status": "approved"
+        },
+        {
+          "id": "{{user.shop_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "write": {
+      "$or": [
+        {
+          "id": "{{user.shop_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

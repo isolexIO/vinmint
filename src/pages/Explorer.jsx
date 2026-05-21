@@ -4,10 +4,11 @@ import { Vehicle } from "@/entities/Vehicle";
 import { ServiceRecord } from "@/entities/ServiceRecord";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Car } from "lucide-react";
+import { Search, Car, Clock, MapPin, Wrench, ExternalLink, Filter } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { format } from "date-fns";
 
 import VehicleCard from "../components/explorer/VehicleCard";
 import ServiceHistoryModal from "../components/explorer/ServiceHistoryModal";

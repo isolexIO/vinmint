@@ -1,0 +1,90 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "user_type": {
+      "type": "string",
+      "enum": [
+        "vehicle_owner",
+        "shop_owner",
+        "admin",
+        "dealer"
+      ],
+      "default": "vehicle_owner",
+      "description": "The role or type of the user account within the VINmint system."
+    },
+    "business_domain": {
+      "type": "string",
+      "description": "Business .VINmint domain for dealers (e.g., DealerName.VINmint)"
+    },
+    "domain_nft_token_id": {
+      "type": "string",
+      "description": "NFT certificate token ID for the business domain"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "User/dealer logo image URL"
+    },
+    "shop_id": {
+      "type": "string",
+      "description": "Reference to certified shop if user is shop owner"
+    },
+    "wallet_address": {
+      "type": "string",
+      "description": "User's primary Solana wallet address"
+    },
+    "wallet_secret_key": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "Encrypted secret key for the user's generated wallet. FOR DEMO PURPOSES ONLY."
+    },
+    "phone": {
+      "type": "string",
+      "description": "Contact phone number"
+    },
+    "address": {
+      "type": "string",
+      "description": "Physical address"
+    },
+    "profile_completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether user has completed profile setup"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude for map location (if dealer)"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude for map location (if dealer)"
+    },
+    "dealer_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "suspended",
+        "revoked"
+      ],
+      "default": "pending",
+      "description": "Dealer certification status"
+    },
+    "business_license": {
+      "type": "string",
+      "description": "Business license number for dealers"
+    },
+    "dealer_verification_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of dealer approval"
+    },
+    "registration_invoice_id": {
+      "type": "string",
+      "description": "Reference to the business registration invoice for dealers"
+    }
+  },
+  "required": []
+}

@@ -1,0 +1,42 @@
+{
+  "name": "SystemConfig",
+  "type": "object",
+  "properties": {
+    "config_key": {
+      "type": "string",
+      "description": "Unique key for the configuration, e.g., 'vin_vault'"
+    },
+    "public_key": {
+      "type": "string",
+      "description": "The public key or wallet address associated with this config"
+    },
+    "secret_key": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "The secret key, stored as a JSON array of numbers"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of what this configuration is for"
+    }
+  },
+  "required": [
+    "config_key",
+    "public_key",
+    "secret_key"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

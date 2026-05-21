@@ -30,6 +30,7 @@ import {
   Upload,
   User as UserIcon
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { format } from "date-fns";
 import ServiceHistoryModal from "../components/explorer/ServiceHistoryModal";
 import BulkUploadModal from "../components/dealer/BulkUploadModal";

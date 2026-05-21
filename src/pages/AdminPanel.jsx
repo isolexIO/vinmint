@@ -16,8 +16,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-
-
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Shield,
   Users,
@@ -28,6 +34,8 @@ import {
   Clock,
   AlertTriangle,
   TrendingUp,
+  Database,
+  Building,
   X,
   MapPin,
   RefreshCw,
@@ -44,8 +52,15 @@ import {
   BarChart3,
   PieChart,
   Activity,
+  Calendar,
   PlusCircle,
   UserPlus,
+  Store,
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  Key,
 } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { motion } from "framer-motion";

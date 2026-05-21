@@ -1,0 +1,75 @@
+{
+  "name": "Transaction",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "The ID of the user who initiated the transaction"
+    },
+    "sender_wallet": {
+      "type": "string",
+      "description": "Sender's Solana wallet address"
+    },
+    "receiver_wallet": {
+      "type": "string",
+      "description": "Receiver's Solana wallet address"
+    },
+    "token_type": {
+      "type": "string",
+      "enum": [
+        "SOL",
+        "VIN"
+      ],
+      "description": "The type of token transferred"
+    },
+    "amount": {
+      "type": "number",
+      "description": "The amount of tokens transferred"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "pending",
+        "failed"
+      ],
+      "default": "completed"
+    },
+    "transaction_hash": {
+      "type": "string",
+      "description": "Simulated transaction hash"
+    }
+  },
+  "required": [
+    "user_id",
+    "sender_wallet",
+    "receiver_wallet",
+    "token_type",
+    "amount"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_id": "{{user.id}}"
+        },
+        {
+          "sender_wallet": "{{user.wallet_address}}"
+        },
+        {
+          "receiver_wallet": "{{user.wallet_address}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

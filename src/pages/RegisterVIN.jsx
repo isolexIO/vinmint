@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from "react";
+import { Vehicle } from "@/entities/Vehicle";
 import { User } from "@/entities/User";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +14,15 @@ import {
   Check,
   AlertTriangle,
   Loader2,
+  Upload,
+  Sparkles,
   Shield,
   Globe,
+  Tv,
+  Database,
+  Wrench,
   Wallet,
+  DollarSign,
   Camera,
   RefreshCw,
   PlusCircle // Added PlusCircle for the updated button icon

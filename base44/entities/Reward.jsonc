@@ -1,0 +1,72 @@
+{
+  "name": "Reward",
+  "type": "object",
+  "properties": {
+    "recipient_id": {
+      "type": "string",
+      "description": "User ID of the reward recipient"
+    },
+    "reward_type": {
+      "type": "string",
+      "enum": [
+        "referral",
+        "registration",
+        "service_completion",
+        "loyalty",
+        "admin_bonus"
+      ],
+      "description": "Type of reward"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Amount of $VIN tokens rewarded"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Reason for the reward"
+    },
+    "transaction_hash": {
+      "type": "string",
+      "description": "Solana transaction hash for the token distribution"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "completed",
+        "failed"
+      ],
+      "default": "pending",
+      "description": "Status of the reward distribution"
+    },
+    "distributed_by": {
+      "type": "string",
+      "description": "Admin user ID who distributed the reward"
+    }
+  },
+  "required": [
+    "recipient_id",
+    "reward_type",
+    "amount",
+    "reason"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "recipient_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
