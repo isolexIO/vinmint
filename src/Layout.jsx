@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { User } from "@/entities/User";
+import { base44 } from "@/api/base44Client";
 import { Vehicle } from "@/entities/Vehicle";
 import { CertifiedShop } from "@/entities/CertifiedShop";
 import { ServiceRecord } from "@/entities/ServiceRecord";
@@ -97,7 +96,7 @@ export default function Layout({ children, currentPageName }) {
         });
         
         // Update user data with live balances
-        await User.updateMyUserData({
+        await base44.auth.updateMe({
           solana_balance: solBalance,
           vin_token_balance: vinTokenBalance
         });
@@ -111,7 +110,7 @@ export default function Layout({ children, currentPageName }) {
 
   const loadUser = useCallback(async () => {
     try {
-      const userData = await User.me();
+      const userData = await base44.auth.me();
       setUser(userData);
       
       // If user has a wallet, fetch live balances
@@ -335,31 +334,12 @@ export default function Layout({ children, currentPageName }) {
 
   const navigationItems = getNavigationItems();
 
-  const handleLogin = async () => {
-    try {
-      // Use loginWithRedirect for proper authentication flow
-      const currentUrl = window.location.href;
-      await User.loginWithRedirect(currentUrl);
-    } catch (error) {
-      console.error("Login failed:", error);
-      // Fallback to basic login if redirect fails
-      try {
-        await User.login();
-      } catch (fallbackError) {
-        console.error("Fallback login also failed:", fallbackError);
-        alert("Login failed. Please try again or contact support.");
-      }
-    }
+  const handleLogin = () => {
+    base44.auth.redirectToLogin(window.location.href);
   };
 
-  const handleLogout = async () => {
-    try {
-      await User.logout();
-      setUser(null);
-      window.location.href = createPageUrl("Home");
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
+  const handleLogout = () => {
+    base44.auth.logout(createPageUrl("Home"));
   };
   
   // handleDisconnect function has been removed.

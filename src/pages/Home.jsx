@@ -1,11 +1,10 @@
-
 import React from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { User } from "@/entities/User";
+import { base44 } from "@/api/base44Client";
 import { getSolanaStats } from "@/functions/getSolanaStats";
 import { 
   Car, 
@@ -41,7 +40,7 @@ export default function HomePage() {
 
   const loadData = async () => {
     try {
-      const userData = await User.me().catch(() => null);
+      const userData = await base44.auth.me().catch(() => null);
       setUser(userData);
 
       const statsResponse = await getSolanaStats();
@@ -62,23 +61,8 @@ export default function HomePage() {
     }
   };
 
-  const handleLogin = async () => {
-    try {
-      // Use loginWithRedirect for proper authentication flow
-      const currentUrl = window.location.href;
-      await User.loginWithRedirect(currentUrl);
-    } catch (error) {
-      console.error("Login failed:", error);
-      // Fallback to basic login if redirect fails
-      try {
-        await User.login();
-        const userData = await User.me();
-        setUser(userData);
-      } catch (fallbackError) {
-        console.error("Fallback login also failed:", fallbackError);
-        alert("Login failed. Please try again or contact support.");
-      }
-    }
+  const handleLogin = () => {
+    base44.auth.redirectToLogin(window.location.href);
   };
 
   const features = [
