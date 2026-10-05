@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { User } from "@/entities/User";
+import { base44 } from "@/api/base44Client";
 import { 
   Building, 
   MapPin, 
@@ -35,7 +34,7 @@ export default function DealerProfileManager({ user }) {
         
         setIsSaving(true);
         try {
-            await User.updateMyUserData(editData);
+            await base44.auth.updateMe(editData);
             alert('Profile updated successfully!');
             setIsEditing(false);
         } catch (error) {

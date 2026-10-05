@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { CertifiedShop } from "@/entities/CertifiedShop";
 import { Vehicle } from "@/entities/Vehicle";
 import { ServiceRecord } from "@/entities/ServiceRecord";
-import { User } from "@/entities/User";
+import { base44 } from "@/api/base44Client";
 import { Invoice } from "@/entities/Invoice";
 import { Reward } from "@/entities/Reward";
 import { RewardSettings } from "@/entities/RewardSettings";
@@ -307,7 +307,7 @@ export default function AdminPanel() {
 
   const loadData = useCallback(async () => {
     try {
-      const user = await User.me();
+      const user = await base44.auth.me();
       setCurrentUser(user);
 
       if (user.user_type !== 'admin') {
@@ -322,8 +322,8 @@ export default function AdminPanel() {
         CertifiedShop.list("-created_date"),
         Vehicle.list("-created_date"),
         ServiceRecord.list("-created_date"),
-        User.filter({ user_type: 'dealer' }, "-created_date"),
-        User.list("-created_date"),
+        base44.entities.User.filter({ user_type: 'dealer' }, "-created_date"),
+        base44.entities.User.list("-created_date"),
         Invoice.list("-created_date") // Load actual invoices
       ]);
 
@@ -475,7 +475,7 @@ export default function AdminPanel() {
 
   const handleUpdateDealerStatus = async (dealerId, status) => {
     try {
-      await User.update(dealerId, {
+      await base44.entities.User.update(dealerId, {
         dealer_status: status,
         dealer_verification_date: status === 'approved' ? new Date().toISOString().split('T')[0] : null
       });

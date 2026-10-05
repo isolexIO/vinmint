@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User } from '@/entities/User';
+import { base44 } from '@/api/base44Client';
 import { Vehicle } from '@/entities/Vehicle';
 import { ServiceRecord } from '@/entities/ServiceRecord';
 import { generateAndSaveWallet } from '@/functions/generateAndSaveWallet';
@@ -111,7 +111,7 @@ export default function WalletPage() {
 
                 // Update user entity with live balances for sidebar
                 try {
-                    await User.updateMyUserData({
+                    await base44.auth.updateMe({
                         solana_balance: newBalances.sol,
                         vin_token_balance: newBalances.vin
                     });
@@ -172,7 +172,7 @@ export default function WalletPage() {
         
         try {
             // First, load user data
-            const userData = await User.me();
+            const userData = await base44.auth.me();
             setUser(userData);
             
             if (!userData || !userData.wallet_address) {

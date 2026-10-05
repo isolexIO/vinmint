@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { CertifiedShop } from '@/entities/CertifiedShop';
-import { User } from '@/entities/User';
+import { base44 } from '@/api/base44Client';
 import { Store, Building, MapPin, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -71,7 +71,7 @@ export default function MapPage() {
             try {
                 const [shopData, userData] = await Promise.all([
                     CertifiedShop.list(),
-                    User.filter({ user_type: 'dealer' })
+                    base44.entities.User.filter({ user_type: 'dealer' })
                 ]);
 
                 // Filter and validate coordinates for shops that are approved

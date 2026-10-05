@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { User } from '@/entities/User';
+import { base44 } from '@/api/base44Client';
 import { Vehicle } from '@/entities/Vehicle';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,7 +27,7 @@ export default function DealerProfile() {
 
             try {
                 const [dealerData, vehicleData] = await Promise.all([
-                    User.get(dealerId),
+                    base44.entities.User.get(dealerId),
                     Vehicle.filter({ dealer_id: dealerId }, '-created_date', 50)
                 ]);
                 setDealer(dealerData);
