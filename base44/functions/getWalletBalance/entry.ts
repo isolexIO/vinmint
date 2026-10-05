@@ -1,5 +1,7 @@
 // Backend function: getWalletBalance
 // Uses direct Solana RPC fetch calls with authenticated endpoint from secrets
+// Token balance is fetched via getAccountInfo on the ATA (computed by the caller)
+// to avoid rate-limited getTokenAccountsByOwner calls
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.0';
 import { secrets } from 'base44:runtime';
 
@@ -14,7 +16,7 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { walletAddress } = await req.json();
+        const { walletAddress, ataAddress } = await req.json();
 
         if (!walletAddress) {
             return Response.json({ error: 'Wallet address is required' }, { status: 400 });
@@ -37,72 +39,85 @@ Deno.serve(async (req) => {
         const solData = await solResponse.json();
         const solBalance = (solData.result?.value || 0) / 1_000_000_000;
 
-        // Fetch VIN token balance via RPC (with retry for rate limits)
+        // Fetch VIN token balance via getAccountInfo on the ATA
+        // This avoids the rate-limited getTokenAccountsByOwner method
         let vinTokenBalance = 0;
         let debugInfo: Record<string, unknown> = {};
 
-        const TOKEN_RPC_FALLBACKS = [
-            SOLANA_RPC_URL,
-            "https://rpc.ankr.com/solana",
-            "https://api.mainnet-beta.solana.com"
-        ];
+        if (ataAddress) {
+            try {
+                const accountResponse = await fetch(SOLANA_RPC_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: "2.0",
+                        id: 2,
+                        method: "getAccountInfo",
+                        params: [ataAddress, { encoding: "jsonParsed", commitment: "confirmed" }]
+                    })
+                });
+                const accountData = await accountResponse.json();
 
-        const fetchTokenBalance = async (): Promise<void> => {
-            for (const rpc of TOKEN_RPC_FALLBACKS) {
-                try {
-                    const tokenResponse = await fetch(rpc, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            jsonrpc: "2.0",
-                            id: 2,
-                            method: "getTokenAccountsByOwner",
-                            params: [
-                                walletAddress,
-                                { mint: VIN_TOKEN_MINT_ADDRESS },
-                                { encoding: "jsonParsed", commitment: "confirmed" }
-                            ]
-                        })
-                    });
-                    const tokenData = await tokenResponse.json();
-
-                    // Skip to next fallback on rate limit or block
-                    if (tokenResponse.status === 429 || tokenResponse.status === 403 || tokenData.error?.code === -32005) {
-                        debugInfo[`attempt_${rpc.substring(0, 30)}`] = { status: tokenResponse.status, error: tokenData.error?.message };
-                        continue;
-                    }
-
-                    if (tokenData.result?.value && tokenData.result.value.length > 0) {
-                        const account = tokenData.result.value[0];
-                        const parsedInfo = account.account?.data?.parsed?.info;
-                        if (parsedInfo?.tokenAmount) {
-                            vinTokenBalance = Number(parsedInfo.tokenAmount.amount || 0) / 1_000_000;
-                            debugInfo.tokenAccountAddress = account.pubkey;
-                            debugInfo.rawAmount = parsedInfo.tokenAmount.amount;
-                            debugInfo.decimals = parsedInfo.tokenAmount.decimals;
-                            debugInfo.success = true;
-                            debugInfo.rpcUsedForToken = rpc.substring(0, 40);
-                            return;
-                        }
-                    } else if (!tokenData.error) {
-                        debugInfo.reason = 'no_token_account';
-                        debugInfo.rpcUsedForToken = rpc.substring(0, 40);
-                        return;
-                    }
-                } catch (e) {
-                    debugInfo[`error_${rpc.substring(0, 20)}`] = e.message;
-                    continue;
+                if (accountData.result?.value?.data?.parsed?.info?.tokenAmount) {
+                    const tokenAmount = accountData.result.value.data.parsed.info.tokenAmount;
+                    vinTokenBalance = Number(tokenAmount.amount || 0) / Math.pow(10, tokenAmount.decimals || 6);
+                    debugInfo.tokenAccountAddress = ataAddress;
+                    debugInfo.rawAmount = tokenAmount.amount;
+                    debugInfo.decimals = tokenAmount.decimals;
+                    debugInfo.success = true;
+                } else if (accountData.result?.value === null) {
+                    debugInfo.reason = 'ata_not_found';
+                    debugInfo.tokenRpcStatus = accountResponse.status;
+                } else {
+                    debugInfo.reason = 'parse_failed';
+                    debugInfo.tokenRpcStatus = accountResponse.status;
+                    debugInfo.rawData = JSON.stringify(accountData.result?.value?.data).substring(0, 200);
                 }
+            } catch (tokenError) {
+                debugInfo.error = tokenError.message;
+                debugInfo.reason = 'fetch_error';
             }
-            debugInfo.reason = 'all_rpcs_failed';
-        };
+        } else {
+            // Fallback: try getTokenAccountsByOwner if no ATA provided
+            try {
+                const tokenResponse = await fetch(SOLANA_RPC_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: "2.0",
+                        id: 2,
+                        method: "getTokenAccountsByOwner",
+                        params: [
+                            walletAddress,
+                            { mint: VIN_TOKEN_MINT_ADDRESS },
+                            { encoding: "jsonParsed", commitment: "confirmed" }
+                        ]
+                    })
+                });
+                const tokenData = await tokenResponse.json();
 
-        try {
-            await fetchTokenBalance();
-        } catch (tokenError) {
-            debugInfo.error = tokenError.message;
-            debugInfo.reason = 'fetch_error';
-            vinTokenBalance = 0;
+                if (tokenData.result?.value && tokenData.result.value.length > 0) {
+                    const account = tokenData.result.value[0];
+                    const parsedInfo = account.account?.data?.parsed?.info;
+                    if (parsedInfo?.tokenAmount) {
+                        vinTokenBalance = Number(parsedInfo.tokenAmount.amount || 0) / 1_000_000;
+                        debugInfo.tokenAccountAddress = account.pubkey;
+                        debugInfo.rawAmount = parsedInfo.tokenAmount.amount;
+                        debugInfo.decimals = parsedInfo.tokenAmount.decimals;
+                        debugInfo.success = true;
+                        debugInfo.fallback = true;
+                    }
+                } else {
+                    debugInfo.reason = 'no_token_account';
+                    debugInfo.tokenRpcStatus = tokenResponse.status;
+                    debugInfo.tokenRpcError = tokenData.error;
+                    debugInfo.fallback = true;
+                }
+            } catch (tokenError) {
+                debugInfo.error = tokenError.message;
+                debugInfo.reason = 'fetch_error';
+                debugInfo.fallback = true;
+            }
         }
 
         return Response.json({
@@ -110,9 +125,6 @@ Deno.serve(async (req) => {
             solBalance,
             vinTokenBalance,
             debug: debugInfo,
-            rpcUsed: SOLANA_RPC_URL.substring(0, 60),
-            solRpcStatus: solResponse.status,
-            solRpcError: solData.error,
             network: 'mainnet-beta',
             tokenProgram: 'Token 2022',
             timestamp: new Date().toISOString()
