@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   Dialog,
@@ -20,7 +19,7 @@ import {
   DollarSign
 } from "lucide-react";
 import { UploadFile } from '@/integrations/Core';
-import { bulkUploadVehicles } from '@/functions/bulkUploadVehicles';
+import { bulkUploadVehicles } from '@/functions/bulkUploadVehicles.js';
 
 export default function BulkUploadModal({ isOpen, onClose, onUploadComplete }) {
   const [uploadStep, setUploadStep] = useState('select'); // select, uploading, processing, complete

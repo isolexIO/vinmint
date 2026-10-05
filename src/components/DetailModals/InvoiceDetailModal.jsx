@@ -1,4 +1,3 @@
-
 import React from 'react';
 import {
     Dialog,
@@ -12,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { FileText, Calendar, DollarSign, User, Shield, Copy, Share2, X, ExternalLink, Download, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { createPageUrl } from '@/utils';
-import { exportInvoiceToPdf } from '@/functions/exportInvoiceToPdf';
+import { exportInvoiceToPdf } from '@/functions/exportInvoiceToPdf.js';
 
 const VinTokenLogoSmall = () => (
     <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68c843bc89d0e71e79dfc721/3ecf32e8e_493130015_122093779586861598_4848437929607844438_n.jpg" alt="VIN Token" className="w-4 h-4 rounded-full" />

@@ -7,9 +7,9 @@ import { Invoice } from "@/entities/Invoice";
 import { Reward } from "@/entities/Reward";
 import { RewardSettings } from "@/entities/RewardSettings";
 import { SystemConfig } from "@/entities/SystemConfig";
-import { updateShopCoordinates } from "@/functions/updateShopCoordinates";
-import { updateDealerCoordinates } from "@/functions/updateDealerCoordinates";
-import { generateVaultWallet } from "@/functions/generateVaultWallet";
+import { updateShopCoordinates } from "@/functions/updateShopCoordinates.js";
+import { updateDealerCoordinates } from "@/functions/updateDealerCoordinates.js";
+import { generateVaultWallet } from "@/functions/generateVaultWallet.js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -82,7 +82,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import ReceiveModal from "../components/wallet/ReceiveModal";
-import { generateInviteLink } from "@/functions/generateInviteLink";
+import { generateInviteLink } from "@/functions/generateInviteLink.js";
 import AddressInput from "../components/AddressInput";
 
 // Solana Logo for UI
@@ -178,7 +178,7 @@ export default function AdminPanel() {
   const loadVaultData = useCallback(async () => {
     setIsLoadingVault(true);
     try {
-      const { manageVinVault } = await import('@/functions/manageVinVault');
+      const { manageVinVault } = await import('@/functions/manageVinVault.js');
       const response = await manageVinVault({ action: 'balance' });
       if (response.data.success) {
         setVaultBalances({
@@ -412,7 +412,7 @@ export default function AdminPanel() {
 
     setIsLoadingVault(true);
     try {
-      const { manageVinVault } = await import('@/functions/manageVinVault');
+      const { manageVinVault } = await import('@/functions/manageVinVault.js');
       const response = await manageVinVault({
         action: 'distribute',
         recipientAddress: distributionForm.recipientAddress,
@@ -557,7 +557,7 @@ export default function AdminPanel() {
 
     setIsProcessingInvite(true);
     try {
-      const { adminCreateUser } = await import('@/functions/adminCreateUser');
+      const { adminCreateUser } = await import('@/functions/adminCreateUser.js');
 
       const userData = {
         email: inviteForm.email,

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from "react";
 import { ServiceRecord } from "@/entities/ServiceRecord";
 import { CertifiedShop } from "@/entities/CertifiedShop";
@@ -43,7 +42,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
-import { mintServiceNFT } from "@/functions/mintServiceNFT";
+import { mintServiceNFT } from "@/functions/mintServiceNFT.js";
 import ShopProfileManager from "../components/shop/ShopProfileManager"; // Replaces ServiceManager for overall profile management
 
 const BaseLogo = () => (

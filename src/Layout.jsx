@@ -6,7 +6,7 @@ import { Vehicle } from "@/entities/Vehicle";
 import { CertifiedShop } from "@/entities/CertifiedShop";
 import { ServiceRecord } from "@/entities/ServiceRecord";
 import { Notification } from "@/entities/Notification"; // Import Notification entity
-import { getWalletBalance } from "@/functions/getWalletBalance"; // Import balance function
+import { getWalletBalance } from "@/functions/getWalletBalance.js"; // Import balance function
 import {
   Car,
   Search,

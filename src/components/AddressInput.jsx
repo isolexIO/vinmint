@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, XCircle, Loader2, MapPin } from "lucide-react";
-import { geocodeAddress } from "@/functions/geocodeAddress";
+import { geocodeAddress } from "@/functions/geocodeAddress.js";
 
 export default function AddressInput({ 
   label = "Address", 

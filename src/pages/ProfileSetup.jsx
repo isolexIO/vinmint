@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { User } from "@/entities/User";
-import { setupUserProfile } from "@/functions/setupUserProfile";
-import { generateAndSaveWallet } from "@/functions/generateAndSaveWallet";
+import { setupUserProfile } from "@/functions/setupUserProfile.js";
+import { generateAndSaveWallet } from "@/functions/generateAndSaveWallet.js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { verifyInviteToken } from "@/functions/verifyInviteToken";
+import { verifyInviteToken } from "@/functions/verifyInviteToken.js";
 
 const VinTokenLogo = () => (
     <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68c843bc89d0e71e79dfc721/3ecf32e8e_493130015_122093779586861598_4848437929607844438_n.jpg" alt="VIN Token" className="w-6 h-6 rounded-full" />

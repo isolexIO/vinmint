@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Vehicle } from "@/entities/Vehicle";
 import { User } from "@/entities/User";
@@ -29,8 +28,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPageUrl } from "@/utils";
-import { registerVINDomain } from "@/functions/registerVINDomain";
-import { getWalletBalance } from "@/functions/getWalletBalance";
+import { registerVINDomain } from "@/functions/registerVINDomain.js";
+import { getWalletBalance } from "@/functions/getWalletBalance.js";
 import VinScanner from "../components/VinScanner";
 
 // VIN Token Logo Component

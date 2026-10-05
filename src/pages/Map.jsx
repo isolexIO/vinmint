@@ -10,7 +10,7 @@ import { base44 } from '@/api/base44Client';
 import { Store, Building, MapPin, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { getSolanaStats } from '@/functions/getSolanaStats';
+import { getSolanaStats } from '@/functions/getSolanaStats.js';
 
 // Custom SVG Icon for Shops
 const shopIcon = new L.Icon({
