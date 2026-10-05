@@ -16,10 +16,10 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized: Admin access required.' }, { status: 401 });
         }
 
-        const { action, recipientAddress, amount, reason, tokenType } = await req.json();
+        const { action, recipientAddress, amount, reason, tokenType, purchaseRate } = await req.json();
 
         if (!action) {
-            return Response.json({ error: 'Action is required (balance, distribute)' }, { status: 400 });
+            return Response.json({ error: 'Action is required (balance, distribute, getPurchaseRate, setPurchaseRate)' }, { status: 400 });
         }
 
         const vaultConfigs = await base44.asServiceRole.entities.SystemConfig.filter({ config_key: 'vin_vault' });
@@ -97,6 +97,35 @@ Deno.serve(async (req) => {
                     details: balanceError.message,
                 }, { status: 500 });
             }
+        }
+
+        // --- Get the current SOL→VIN purchase rate ---
+        if (action === 'getPurchaseRate') {
+            const rateConfig = await base44.asServiceRole.entities.SystemConfig.filter({ config_key: 'vin_purchase_rate' });
+            const rate = rateConfig.length > 0 ? parseFloat(rateConfig[0].description || '0') : 0;
+            return Response.json({ success: true, rate, isConfigured: rate > 0 });
+        }
+
+        // --- Set the SOL→VIN purchase rate (VIN tokens per 1 SOL) ---
+        if (action === 'setPurchaseRate') {
+            if (!purchaseRate || purchaseRate <= 0) {
+                return Response.json({ error: 'A positive purchase rate is required' }, { status: 400 });
+            }
+            const existing = await base44.asServiceRole.entities.SystemConfig.filter({ config_key: 'vin_purchase_rate' });
+            if (existing.length > 0) {
+                await base44.asServiceRole.entities.SystemConfig.update(existing[0].id, {
+                    description: String(purchaseRate),
+                    public_key: vaultPublicKey,
+                });
+            } else {
+                await base44.asServiceRole.entities.SystemConfig.create({
+                    config_key: 'vin_purchase_rate',
+                    public_key: vaultPublicKey,
+                    secret_key: [],
+                    description: String(purchaseRate),
+                });
+            }
+            return Response.json({ success: true, rate: purchaseRate, message: 'Purchase rate updated' });
         }
 
         if (action === 'distribute') {

@@ -409,4 +409,191 @@ export async function transferVinTokens(
   );
 }
 
+// --- PDA (Program Derived Address) derivation ---
+// Needed to compute Associated Token Account addresses without @solana/web3.js
+
+const ED25519_P = 2n ** 255n - 19n;
+
+function mod(a: bigint, m: bigint): bigint {
+  return ((a % m) + m) % m;
+}
+
+function modInverse(a: bigint, m: bigint): bigint {
+  let [oldR, r] = [mod(a, m), m];
+  let [oldS, s] = [1n, 0n];
+  while (r !== 0n) {
+    const q = oldR / r;
+    [oldR, r] = [r, oldR - q * r];
+    [oldS, s] = [s, oldS - q * s];
+  }
+  return mod(oldS, m);
+}
+
+function modPow(base: bigint, exp: bigint, m: bigint): bigint {
+  let result = 1n;
+  base = mod(base, m);
+  while (exp > 0n) {
+    if (exp & 1n) result = mod(result * base, m);
+    exp >>= 1n;
+    base = mod(base * base, m);
+  }
+  return result;
+}
+
+// Ed25519 curve check: returns true if the 32-byte hash is a valid curve point
+// For PDA derivation we want a point that is NOT on the curve.
+const ED25519_D = mod(-121665n * modInverse(121666n, ED25519_P), ED25519_P);
+
+function isOnCurve(hash: Uint8Array): boolean {
+  // Parse y coordinate (little-endian, clear sign bit on byte[31])
+  let y = 0n;
+  for (let i = 31; i >= 0; i--) {
+    let byteVal = BigInt(hash[i]);
+    if (i === 31) byteVal &= 0x7fn;
+    y = y * 256n + byteVal;
+  }
+  const y2 = mod(y * y, ED25519_P);
+  const u = mod(y2 - 1n, ED25519_P);
+  const v = mod(ED25519_D * y2 + 1n, ED25519_P);
+  if (v === 0n) return false;
+  const x2 = mod(u * modInverse(v, ED25519_P), ED25519_P);
+  // Euler's criterion: x2 is a QR iff x2^((p-1)/2) == 1
+  const legendre = modPow(x2, (ED25519_P - 1n) / 2n, ED25519_P);
+  return legendre === 1n;
+}
+
+async function sha256(data: Uint8Array): Promise<Uint8Array> {
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  return new Uint8Array(buf);
+}
+
+export async function findProgramAddress(
+  seeds: Uint8Array[],
+  programId: Uint8Array
+): Promise<Uint8Array> {
+  for (let bump = 255; bump >= 0; bump--) {
+    const totalLen =
+      seeds.reduce((s, seed) => s + seed.length, 0) + 1 + programId.length;
+    const data = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const seed of seeds) {
+      data.set(seed, offset);
+      offset += seed.length;
+    }
+    data.set([bump], offset);
+    offset += 1;
+    data.set(programId, offset);
+    const hash = await sha256(data);
+    if (!isOnCurve(hash)) {
+      return hash;
+    }
+  }
+  throw new Error("Unable to find program address");
+}
+
+// Compute the Associated Token Account address for a given owner + mint
+export async function getAssociatedTokenAddress(
+  ownerAddress: string,
+  mintAddress: string
+): Promise<string> {
+  const owner = base58Decode(ownerAddress);
+  const mint = base58Decode(mintAddress);
+  const ata = await findProgramAddress(
+    [owner, TOKEN_2022_PROGRAM_ID, mint],
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
+  return base58Encode(ata);
+}
+
+// Build a CreateAssociatedTokenAccountIdempotent instruction
+function createAtaInstruction(
+  payerIndex: number,
+  ataIndex: number,
+  ownerIndex: number,
+  mintIndex: number,
+  systemProgramIndex: number,
+  tokenProgramIndex: number
+): RawInstruction {
+  return {
+    programIdIndex: 0, // set by caller
+    accounts: [payerIndex, ataIndex, ownerIndex, mintIndex, systemProgramIndex, tokenProgramIndex],
+    data: new Uint8Array([1]), // CreateAssociatedTokenAccountIdempotent
+  };
+}
+
+// Transfer VIN tokens from vault to user, creating the user's ATA if it doesn't exist.
+// This is a single atomic transaction: [createATA (idempotent), transferChecked].
+export async function transferVinTokensWithATA(
+  vaultKeypair: SolanaKeypair,
+  vaultTokenAccountAddress: string,
+  userWalletAddress: string,
+  userAtaAddress: string,
+  mintAddress: string,
+  amount: number,
+  decimals: number = 6
+): Promise<string> {
+  const vaultTokenAccount = base58Decode(vaultTokenAccountAddress);
+  const userAta = base58Decode(userAtaAddress);
+  const userWallet = base58Decode(userWalletAddress);
+  const mintPubkey = base58Decode(mintAddress);
+
+  // Account order: writable signer, writable non-signer, readonly non-signer
+  // 0: vault (signer, writable) - payer + token owner
+  // 1: vault token account (writable, non-signer) - source
+  // 2: user ATA (writable, non-signer) - destination (may be created)
+  // 3: user wallet (readonly, non-signer) - ATA owner
+  // 4: mint (readonly, non-signer)
+  // 5: system program (readonly, non-signer)
+  // 6: token-2022 program (readonly, non-signer)
+  // 7: ATA program (readonly, non-signer)
+  const accountKeys: Uint8Array[] = [
+    vaultKeypair.publicKey,
+    vaultTokenAccount,
+    userAta,
+    userWallet,
+    mintPubkey,
+    SYSTEM_PROGRAM_ID,
+    TOKEN_2022_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+  ];
+
+  const createAta = createAtaInstruction(0, 2, 3, 4, 5, 6);
+  createAta.programIdIndex = 7; // ATA program
+
+  const transfer = tokenTransferCheckedInstruction(1, 4, 2, 0, amount, decimals);
+  transfer.programIdIndex = 6; // Token-2022 program
+
+  return await signAndSendTransaction(
+    vaultKeypair,
+    accountKeys,
+    [createAta, transfer],
+    1, // 1 required signature (vault)
+    0, // 0 readonly signed
+    5  // 5 readonly unsigned (user wallet, mint, system, token program, ATA program)
+  );
+}
+
+// Verify a transaction was confirmed on-chain
+export async function confirmTransaction(
+  signature: string,
+  maxRetries: number = 10
+): Promise<boolean> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const result: any = await rpcCall("getSignatureStatuses", [[signature]]);
+      const status = result?.value?.[0];
+      if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") {
+        return true;
+      }
+      if (status?.err) {
+        return false;
+      }
+    } catch {
+      // ignore and retry
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  return false;
+}
+
 export { getRpcUrl as SOLANA_RPC_URL, TOKEN_2022_PROGRAM_ID };

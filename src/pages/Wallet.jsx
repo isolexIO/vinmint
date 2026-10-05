@@ -36,11 +36,13 @@ import {
   Globe,
   Zap,
   QrCode,
-  DollarSign
+  DollarSign,
+  ShoppingCart
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import TransferModal from '../components/wallet/TransferModal';
 import ReceiveModal from '../components/wallet/ReceiveModal';
+import BuyVinModal from '../components/wallet/BuyVinModal';
 import { format } from 'date-fns';
 
 const SolanaLogo = () => (
@@ -70,6 +72,7 @@ export default function WalletPage() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [showTransferModal, setShowTransferModal] = useState(false);
     const [showReceiveModal, setShowReceiveModal] = useState(false);
+    const [showBuyVinModal, setShowBuyVinModal] = useState(false);
     const [showPrivateKeyModal, setShowPrivateKeyModal] = useState(false);
     const [privateKey, setPrivateKey] = useState(null);
     const [isFetchingKey, setIsFetchingKey] = useState(false);
@@ -352,6 +355,13 @@ export default function WalletPage() {
                 onClose={() => setShowReceiveModal(false)}
                 walletAddress={user.wallet_address}
             />
+
+            <BuyVinModal
+                isOpen={showBuyVinModal}
+                onClose={() => setShowBuyVinModal(false)}
+                walletAddress={user.wallet_address}
+                onPurchaseSuccess={loadWalletData}
+            />
             
             <Dialog open={showPrivateKeyModal} onOpenChange={setShowPrivateKeyModal}>
                 <DialogContent className="bg-slate-900 border-red-500 text-white">
@@ -546,6 +556,10 @@ export default function WalletPage() {
                                    <Button onClick={() => setShowTransferModal(true)} className="bg-gradient-to-r from-purple-600 to-blue-600 text-white h-20 flex-col text-sm gap-1">
                                         <ArrowUpCircle className="w-6 h-6" />
                                         Send Tokens
+                                    </Button>
+                                    <Button onClick={() => setShowBuyVinModal(true)} className="bg-gradient-to-r from-amber-500 to-orange-600 text-white h-20 flex-col text-sm gap-1 hover:from-amber-400 hover:to-orange-500">
+                                        <ShoppingCart className="w-6 h-6" />
+                                        Buy VIN
                                     </Button>
                                     <Button onClick={openReceiveModal} className="bg-gradient-to-r from-green-600 to-emerald-600 text-white h-20 flex-col text-sm gap-1">
                                         <QrCode className="w-6 h-6" />

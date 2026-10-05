@@ -114,6 +114,8 @@ export default function AdminPanel() {
   const [isGeneratingVault, setIsGeneratingVault] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [showVaultReceiveModal, setShowVaultReceiveModal] = useState(false);
+  const [purchaseRate, setPurchaseRate] = useState('');
+  const [isSavingRate, setIsSavingRate] = useState(false);
   const [showSecretKey, setShowSecretKey] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteType, setInviteType] = useState('');
@@ -202,6 +204,16 @@ export default function AdminPanel() {
     } catch (error) {
       console.error('Error fetching vault config:', error);
       setVaultConfig(null);
+    }
+    // Fetch purchase rate
+    try {
+      const { manageVinVault: vaultFn } = await import('@/functions/manageVinVault.js');
+      const rateRes = await vaultFn({ action: 'getPurchaseRate' });
+      if (rateRes.data?.success) {
+        setPurchaseRate(rateRes.data.rate > 0 ? String(rateRes.data.rate) : '');
+      }
+    } catch (e) {
+      console.warn('Failed to load purchase rate:', e);
     }
   }, []);
 
@@ -456,6 +468,28 @@ export default function AdminPanel() {
       alert(userMessage);
     } finally {
       setIsLoadingVault(false);
+    }
+  };
+
+  const handleSavePurchaseRate = async () => {
+    const rate = parseFloat(purchaseRate);
+    if (!rate || rate <= 0) {
+      alert("Please enter a valid rate greater than 0");
+      return;
+    }
+    setIsSavingRate(true);
+    try {
+      const { manageVinVault } = await import('@/functions/manageVinVault.js');
+      const response = await manageVinVault({ action: 'setPurchaseRate', purchaseRate: rate });
+      if (response.data.success) {
+        alert(`Purchase rate set to ${rate} VIN per 1 SOL`);
+      } else {
+        throw new Error(response.data.error || 'Failed to set rate');
+      }
+    } catch (error) {
+      alert(`Failed to set purchase rate: ${error.message}`);
+    } finally {
+      setIsSavingRate(false);
     }
   };
 
@@ -1177,6 +1211,39 @@ export default function AdminPanel() {
                         </AlertDescription>
                       </Alert>
                     )}
+
+                    {/* Token Purchase Rate Configuration */}
+                    <div className="p-4 bg-slate-700/50 rounded-lg border border-purple-500/20">
+                      <h3 className="text-white font-semibold mb-1 flex items-center gap-2">
+                        <DollarSign className="w-4 h-4 text-purple-400" />
+                        VIN Token Purchase Rate
+                      </h3>
+                      <p className="text-slate-400 text-xs mb-3">
+                        Set how many VIN tokens a user receives per 1 SOL sent to the vault.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="flex-1">
+                          <Label className="text-slate-400 text-xs">VIN tokens per 1 SOL</Label>
+                          <Input
+                            type="number"
+                            step="1"
+                            min="1"
+                            value={purchaseRate}
+                            onChange={(e) => setPurchaseRate(e.target.value)}
+                            className="mt-1 bg-slate-800/50 border-purple-500/30 text-white"
+                            placeholder="e.g. 1000"
+                          />
+                        </div>
+                        <Button
+                          onClick={handleSavePurchaseRate}
+                          disabled={isSavingRate}
+                          className="sm:self-end bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white"
+                        >
+                          {isSavingRate ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <DollarSign className="w-4 h-4 mr-2" />}
+                          {isSavingRate ? 'Saving...' : 'Save Rate'}
+                        </Button>
+                      </div>
+                    </div>
 
                     {/* Actions */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
