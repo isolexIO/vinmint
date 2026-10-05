@@ -359,6 +359,23 @@ export default function HomePage() {
           </motion.div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="border-t border-purple-500/20 bg-slate-950/50 py-8 px-4">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-slate-400 text-sm">
+            © {new Date().getFullYear()} Isolex Corporation. All Rights Reserved.
+          </p>
+          <div className="flex items-center gap-6 text-sm">
+            <Link to={createPageUrl("TermsOfUse")} className="text-slate-400 hover:text-purple-300 transition-colors">
+              Terms of Use
+            </Link>
+            <Link to={createPageUrl("PrivacyPolicy")} className="text-slate-400 hover:text-purple-300 transition-colors">
+              Privacy Policy
+            </Link>
+          </div>
+        </div>
+      </footer>
       </div>
     </div>
   );

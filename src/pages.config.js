@@ -13,6 +13,8 @@ import DealerProfile from './pages/DealerProfile';
 import Wallet from './pages/Wallet';
 import ServiceRecordPublicView from './pages/ServiceRecordPublicView';
 import InvoicePublicView from './pages/InvoicePublicView';
+import TermsOfUse from './pages/TermsOfUse';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 import __Layout from './Layout.jsx';
 
 
@@ -32,6 +34,8 @@ export const PAGES = {
     "Wallet": Wallet,
     "ServiceRecordPublicView": ServiceRecordPublicView,
     "InvoicePublicView": InvoicePublicView,
+    "TermsOfUse": TermsOfUse,
+    "PrivacyPolicy": PrivacyPolicy,
 }
 
 export const pagesConfig = {
