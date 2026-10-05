@@ -1,21 +1,13 @@
-
+// Backend function: processVinVaultPayment
+// Uses shared solanaWallet module (tweetnacl + raw RPC) instead of @solana/web3.js
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.0';
-import { 
-  Connection, 
-  Keypair, 
-  PublicKey, 
-  Transaction,
-  SystemProgram,
-  LAMPORTS_PER_SOL
-} from 'npm:@solana/web3.js@1.78.5';
-import { 
-  createTransferInstruction,
-  getAssociatedTokenAddress,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  TOKEN_PROGRAM_ID
-} from 'npm:@solana/spl-token@0.3.8';
+import {
+    keypairFromSecretKey,
+    transferVinTokens,
+    getTokenAccountsByOwner
+} from '../../shared/solanaWallet.ts';
 
-const connection = new Connection('https://api.mainnet-beta.solana.com');
+const VIN_TOKEN_MINT_ADDRESS = "DkorbGQdBUBcwFbXejktt3gxgBsM4YDENb5xoQzYC5xg";
 
 Deno.serve(async (req) => {
     try {
@@ -41,52 +33,41 @@ Deno.serve(async (req) => {
         const vaultConfig = vinVaultConfig[0];
         const vinVaultAddress = vaultConfig.public_key;
 
-        // Get user's wallet keypair (in a real app, this would be handled more securely)
+        // Get user's wallet keypair
         const userWalletData = await base44.asServiceRole.entities.User.get(user.id);
         if (!userWalletData.wallet_secret_key) {
             return Response.json({ error: 'User wallet secret key not found' }, { status: 400 });
         }
 
-        const userKeypair = Keypair.fromSecretKey(new Uint8Array(userWalletData.wallet_secret_key));
+        const userKeypair = keypairFromSecretKey(new Uint8Array(userWalletData.wallet_secret_key));
 
-        // VIN Token mint address (this would be the actual VIN token mint on mainnet)
-        // For demo purposes, we'll simulate this
-        const VIN_TOKEN_MINT = new PublicKey('VINTokenMintAddress123456789'); // Replace with actual mint
+        // Find user's token account
+        const userTokenAccount = await getTokenAccountsByOwner(user.wallet_address, VIN_TOKEN_MINT_ADDRESS);
+        if (!userTokenAccount) {
+            return Response.json({
+                error: 'You do not have a VIN token account. Please receive VIN tokens first.',
+            }, { status: 400 });
+        }
 
-        // Get associated token accounts
-        const userTokenAccount = await getAssociatedTokenAddress(
-            VIN_TOKEN_MINT,
-            userKeypair.publicKey
+        // Find vault's token account
+        const vaultTokenAccount = await getTokenAccountsByOwner(vinVaultAddress, VIN_TOKEN_MINT_ADDRESS);
+        if (!vaultTokenAccount) {
+            return Response.json({
+                error: 'VIN Vault does not have a VIN token account.',
+                vault_address: vinVaultAddress
+            }, { status: 400 });
+        }
+
+        const tokenAmount = Math.floor(amount_vin * 1_000_000);
+
+        const signature = await transferVinTokens(
+            userKeypair,
+            userTokenAccount.address,
+            vaultTokenAccount.address,
+            VIN_TOKEN_MINT_ADDRESS,
+            tokenAmount,
+            6
         );
-
-        const vaultTokenAccount = await getAssociatedTokenAddress(
-            VIN_TOKEN_MINT,
-            new PublicKey(vinVaultAddress)
-        );
-
-        // Create transfer transaction
-        const transaction = new Transaction();
-
-        // Convert VIN amount to token units (assuming 6 decimals for VIN token)
-        const tokenAmount = Math.floor(amount_vin * 1000000);
-
-        transaction.add(
-            createTransferInstruction(
-                userTokenAccount,    // source
-                vaultTokenAccount,   // destination
-                userKeypair.publicKey, // owner
-                tokenAmount          // amount
-            )
-        );
-
-        // Send transaction
-        const signature = await connection.sendTransaction(transaction, [userKeypair], {
-            commitment: 'confirmed',
-            preflightCommitment: 'confirmed'
-        });
-
-        // Wait for confirmation
-        await connection.confirmTransaction(signature, 'confirmed');
 
         // Update user's VIN balance
         const newBalance = (userWalletData.vin_token_balance || 0) - amount_vin;
@@ -105,7 +86,6 @@ Deno.serve(async (req) => {
             transaction_hash: signature
         });
 
-        // Create a notification for the user
         await base44.asServiceRole.entities.Notification.create({
             user_id: user.id,
             message: `Your payment of ${amount_vin} VIN to the VIN Vault was successful.`,
@@ -128,10 +108,10 @@ Deno.serve(async (req) => {
 
     } catch (error) {
         console.error('Error processing VIN Vault payment:', error);
-        return Response.json({ 
+        return Response.json({
             success: false,
-            error: 'Failed to process payment to VIN Vault', 
-            details: error.message 
+            error: 'Failed to process payment to VIN Vault',
+            details: error.message
         }, { status: 500 });
     }
 });

@@ -1,15 +1,11 @@
+// Backend function: processRewards
+// Uses shared solanaWallet module (tweetnacl + raw RPC) instead of @solana/web3.js
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.0';
 import {
-    Connection,
-    clusterApiUrl,
-    Keypair,
-    PublicKey,
-    Transaction as SolanaTransaction
-} from 'npm:@solana/web3.js@1.78.5';
-import {
-    getOrCreateAssociatedTokenAccount,
-    createTransferInstruction
-} from 'npm:@solana/spl-token@0.3.8';
+    keypairFromSecretKey,
+    transferVinTokens,
+    getTokenAccountsByOwner
+} from '../../shared/solanaWallet.ts';
 
 const VIN_TOKEN_MINT_ADDRESS = "DkorbGQdBUBcwFbXejktt3gxgBsM4YDENb5xoQzYC5xg";
 
@@ -34,46 +30,42 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Recipient not found or no wallet address' }, { status: 400 });
         }
 
-        // Get vault wallet secret key
-        const VAULT_SECRET_KEY_STRING = Deno.env.get("VIN_VAULT_SECRET_KEY");
-        if (!VAULT_SECRET_KEY_STRING) {
-            throw new Error("VIN_VAULT_SECRET_KEY is not set in environment variables.");
+        // Get vault wallet from SystemConfig
+        const vaultConfigs = await base44.asServiceRole.entities.SystemConfig.filter({ config_key: 'vin_vault' });
+        if (vaultConfigs.length === 0 || !vaultConfigs[0].secret_key) {
+            return Response.json({ error: 'VIN Vault is not configured.' }, { status: 500 });
         }
-        const vaultKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(VAULT_SECRET_KEY_STRING)));
-        
-        const connection = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
-        const mintPublicKey = new PublicKey(VIN_TOKEN_MINT_ADDRESS);
-        const recipientPublicKey = new PublicKey(recipient.wallet_address);
 
-        // Get or create vault token account
-        const vaultTokenAccount = await getOrCreateAssociatedTokenAccount(
-            connection,
+        const vaultKeypair = keypairFromSecretKey(new Uint8Array(vaultConfigs[0].secret_key));
+
+        // Find vault token account
+        const vaultTokenAccount = await getTokenAccountsByOwner(vaultKeypair.publicKeyBase58, VIN_TOKEN_MINT_ADDRESS);
+        if (!vaultTokenAccount) {
+            return Response.json({
+                error: 'Vault does not have a VIN token account. Send VIN tokens to the vault address first.',
+                vault_address: vaultKeypair.publicKeyBase58
+            }, { status: 400 });
+        }
+
+        // Find recipient token account
+        const recipientTokenAccount = await getTokenAccountsByOwner(recipient.wallet_address, VIN_TOKEN_MINT_ADDRESS);
+        if (!recipientTokenAccount) {
+            return Response.json({
+                error: `Recipient does not have a VIN token account. They need to receive VIN tokens first.`,
+                recipient: recipient.wallet_address
+            }, { status: 400 });
+        }
+
+        const transferAmount = Math.floor(amount * 1_000_000); // 6 decimals
+
+        const signature = await transferVinTokens(
             vaultKeypair,
-            mintPublicKey,
-            vaultKeypair.publicKey
-        );
-
-        // Get or create recipient token account
-        const recipientTokenAccount = await getOrCreateAssociatedTokenAccount(
-            connection,
-            vaultKeypair, // Payer for account creation
-            mintPublicKey,
-            recipientPublicKey
-        );
-
-        const transferAmount = amount * 1_000_000; // Convert to token units (6 decimals)
-
-        // Create transfer instruction
-        const transferInstruction = createTransferInstruction(
             vaultTokenAccount.address,
             recipientTokenAccount.address,
-            vaultKeypair.publicKey,
-            transferAmount
+            VIN_TOKEN_MINT_ADDRESS,
+            transferAmount,
+            6
         );
-
-        const transaction = new SolanaTransaction().add(transferInstruction);
-        const signature = await connection.sendTransaction(transaction, [vaultKeypair]);
-        await connection.confirmTransaction(signature, 'confirmed');
 
         // Create reward record
         await base44.asServiceRole.entities.Reward.create({
@@ -86,10 +78,9 @@ Deno.serve(async (req) => {
             distributed_by: user.id
         });
 
-        // Log the distribution in Transaction entity
         await base44.asServiceRole.entities.Transaction.create({
             user_id: user.id,
-            sender_wallet: vaultKeypair.publicKey.toBase58(),
+            sender_wallet: vaultKeypair.publicKeyBase58,
             receiver_wallet: recipient.wallet_address,
             token_type: "VIN",
             amount: amount,

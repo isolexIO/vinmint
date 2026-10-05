@@ -1,5 +1,7 @@
+// Backend function: getSolanaTransactions
+// Uses shared solanaWallet module (direct RPC fetch) instead of @solana/web3.js
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.0';
-import { Connection, clusterApiUrl, PublicKey } from 'npm:@solana/web3.js@1.78.5';
+import { getSignaturesForAddress, getParsedTransactions } from '../../shared/solanaWallet.ts';
 
 Deno.serve(async (req) => {
     console.log("getSolanaTransactions function invoked.");
@@ -10,46 +12,39 @@ Deno.serve(async (req) => {
         if (!user) {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
-        
+
         const { walletAddress, limit = 10 } = await req.json();
-        
+
         if (!walletAddress) {
             return Response.json({ error: 'Wallet address is required' }, { status: 400 });
         }
-        
-        console.log(`Fetching transaction history for: ${walletAddress}`);
-        
-        const connection = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
-        const publicKey = new PublicKey(walletAddress);
 
-        const signatures = await connection.getSignaturesForAddress(publicKey, { limit: limit });
+        console.log(`Fetching transaction history for: ${walletAddress}`);
+
+        const signatures = await getSignaturesForAddress(walletAddress, limit);
         console.log(`Found ${signatures.length} transaction signatures. Fetching details...`);
-        
+
         if (signatures.length === 0) {
             return Response.json({ success: true, transactions: [], count: 0, network: 'mainnet-beta' });
         }
 
-        const signatureStrings = signatures.map(sig => sig.signature);
-        
-        // Chunking the signatures to avoid hitting rate limits on getParsedTransactions
+        const signatureStrings = signatures.map((sig: any) => sig.signature);
+
+        // Chunk to avoid rate limits
         const chunkSize = 5;
-        const chunks = [];
+        const chunks: string[][] = [];
         for (let i = 0; i < signatureStrings.length; i += chunkSize) {
             chunks.push(signatureStrings.slice(i, i + chunkSize));
         }
 
-        let allParsedTransactions = [];
+        let allParsedTransactions: any[] = [];
         for (const chunk of chunks) {
             try {
-                const parsedChunk = await connection.getParsedTransactions(chunk, {
-                    maxSupportedTransactionVersion: 0
-                });
+                const parsedChunk = await getParsedTransactions(chunk);
                 allParsedTransactions.push(...parsedChunk);
-                // Add a small delay to avoid overwhelming the RPC node
-                await new Promise(resolve => setTimeout(resolve, 500)); 
-            } catch (e) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            } catch (e: any) {
                 console.warn(`A chunk of transactions failed to load: ${e.message}`);
-                // Push nulls for the failed chunk to maintain index mapping
                 allParsedTransactions.push(...Array(chunk.length).fill(null));
             }
         }
@@ -58,7 +53,7 @@ Deno.serve(async (req) => {
             if (!tx) return null;
 
             const walletAccountIndex = tx.transaction.message.accountKeys.findIndex(
-                key => key.pubkey.equals(publicKey)
+                (key: any) => key.pubkey === walletAddress
             );
 
             let balanceChange = 0;
@@ -77,7 +72,7 @@ Deno.serve(async (req) => {
                 status: tx.meta.err ? 'failed' : 'success',
                 balanceChange: balanceChange,
             };
-        }).filter(Boolean); // Remove any null transactions
+        }).filter(Boolean);
 
         return Response.json({
             success: true,
@@ -88,10 +83,10 @@ Deno.serve(async (req) => {
 
     } catch (error) {
         console.error('Error fetching Solana transactions:', error);
-        return Response.json({ 
+        return Response.json({
             success: false,
-            error: 'Failed to fetch transaction history', 
-            details: error.message 
+            error: 'Failed to fetch transaction history',
+            details: error.message
         }, { status: 500 });
     }
 });

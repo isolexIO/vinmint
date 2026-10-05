@@ -1,17 +1,13 @@
+// Backend function: transferTokens
+// Uses shared solanaWallet module (tweetnacl + raw RPC) instead of @solana/web3.js
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.0';
 import {
-    Connection,
-    clusterApiUrl,
-    Keypair,
-    SystemProgram,
-    Transaction as SolanaTransaction,
-    PublicKey,
-} from 'npm:@solana/web3.js@1.78.5';
-import { 
-    getOrCreateAssociatedTokenAccount, 
-    createTransferInstruction,
-    TOKEN_2022_PROGRAM_ID
-} from 'npm:@solana/spl-token@0.3.8';
+    keypairFromSecretKey,
+    isValidPublicKey,
+    transferSol,
+    transferVinTokens,
+    getTokenAccountsByOwner
+} from '../../shared/solanaWallet.ts';
 
 const VIN_TOKEN_MINT_ADDRESS = "DkorbGQdBUBcwFbXejktt3gxgBsM4YDENb5xoQzYC5xg";
 
@@ -25,72 +21,56 @@ Deno.serve(async (req) => {
         }
 
         const { recipientAddress, amount, tokenType } = await req.json();
-        
-        // Connect to the Solana MAINNET cluster
-        const connection = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
 
-        const secretKeyUint8 = new Uint8Array(user.wallet_secret_key);
-        const fromKeypair = Keypair.fromSecretKey(secretKeyUint8);
-        const toPublicKey = new PublicKey(recipientAddress);
+        if (!recipientAddress || !amount || amount <= 0) {
+            return Response.json({ error: 'Recipient address and positive amount are required' }, { status: 400 });
+        }
 
-        const transaction = new SolanaTransaction();
-        
+        if (!isValidPublicKey(recipientAddress)) {
+            return Response.json({ error: 'Invalid recipient wallet address' }, { status: 400 });
+        }
+
+        const fromKeypair = keypairFromSecretKey(new Uint8Array(user.wallet_secret_key));
+
+        let signature: string;
+
         if (tokenType === 'SOL') {
-            transaction.add(
-                SystemProgram.transfer({
-                    fromPubkey: fromKeypair.publicKey,
-                    toPubkey: toPublicKey,
-                    lamports: amount * 1_000_000_000, // Convert SOL to lamports
-                })
-            );
+            signature = await transferSol(fromKeypair, recipientAddress, amount);
         } else if (tokenType === 'VIN') {
-            const mintPublicKey = new PublicKey(VIN_TOKEN_MINT_ADDRESS);
+            // Find sender's token account
+            const fromTokenAccount = await getTokenAccountsByOwner(fromKeypair.publicKeyBase58, VIN_TOKEN_MINT_ADDRESS);
+            if (!fromTokenAccount) {
+                return Response.json({
+                    error: 'You do not have a VIN token account. Please receive VIN tokens first to create one.',
+                }, { status: 400 });
+            }
 
-            const fromTokenAccount = await getOrCreateAssociatedTokenAccount(
-                connection,
+            // Find recipient's token account
+            const toTokenAccount = await getTokenAccountsByOwner(recipientAddress, VIN_TOKEN_MINT_ADDRESS);
+            if (!toTokenAccount) {
+                return Response.json({
+                    error: 'Recipient does not have a VIN token account. They need to receive VIN tokens first to create one.',
+                }, { status: 400 });
+            }
+
+            const tokenAmount = Math.floor(amount * 1_000_000); // 6 decimals
+            signature = await transferVinTokens(
                 fromKeypair,
-                mintPublicKey,
-                fromKeypair.publicKey,
-                false,
-                'confirmed',
-                {},
-                TOKEN_2022_PROGRAM_ID // Use Token 2022 program
-            );
-
-            const toTokenAccount = await getOrCreateAssociatedTokenAccount(
-                connection,
-                fromKeypair,
-                mintPublicKey,
-                toPublicKey,
-                false,
-                'confirmed',
-                {},
-                TOKEN_2022_PROGRAM_ID // Use Token 2022 program
-            );
-
-            transaction.add(
-                createTransferInstruction(
-                    fromTokenAccount.address,
-                    toTokenAccount.address,
-                    fromKeypair.publicKey,
-                    amount * 1_000_000, // $VIN has 6 decimals
-                    [],
-                    TOKEN_2022_PROGRAM_ID // Use Token 2022 program
-                )
+                fromTokenAccount.address,
+                toTokenAccount.address,
+                VIN_TOKEN_MINT_ADDRESS,
+                tokenAmount,
+                6
             );
         } else {
             return Response.json({ error: 'Invalid token type' }, { status: 400 });
         }
 
-        const signature = await connection.sendTransaction(transaction, [fromKeypair]);
-        await connection.confirmTransaction(signature, 'confirmed');
+        console.log(`Transfer successful! Signature: ${signature}`);
 
-        console.log(`Mainnet Token 2022 transfer successful! Signature: ${signature}`);
-
-        // Create a record of the transaction in the database
         await base44.asServiceRole.entities.Transaction.create({
             user_id: user.id,
-            sender_wallet: fromKeypair.publicKey.toBase58(),
+            sender_wallet: fromKeypair.publicKeyBase58,
             receiver_wallet: recipientAddress,
             token_type: tokenType,
             amount: amount,
@@ -105,7 +85,7 @@ Deno.serve(async (req) => {
         });
 
     } catch (error) {
-        console.error('Error in mainnet Token 2022 transferTokens:', error);
+        console.error('Error in transferTokens:', error);
         return Response.json({
             error: 'Transfer failed',
             details: error.message

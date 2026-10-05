@@ -1,5 +1,7 @@
+// Backend function: generateVaultWallet
+// Uses shared solanaWallet module (tweetnacl) instead of @solana/web3.js to avoid Deno bundling issues
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.0';
-import { Keypair } from 'npm:@solana/web3.js@1.78.5';
+import { generateKeypair } from '../../shared/solanaWallet.ts';
 
 Deno.serve(async (req) => {
     try {
@@ -17,8 +19,8 @@ Deno.serve(async (req) => {
         }
 
         // 2. Generate a new Solana Keypair
-        const keypair = Keypair.generate();
-        const publicKey = keypair.publicKey.toBase58();
+        const keypair = generateKeypair();
+        const publicKey = keypair.publicKeyBase58;
         const secretKeyArray = Array.from(keypair.secretKey);
 
         // 3. Save the new keypair to the SystemConfig entity
@@ -37,10 +39,10 @@ Deno.serve(async (req) => {
 
     } catch (error) {
         console.error('Error generating vault wallet:', error);
-        return Response.json({ 
-            success: false, 
-            error: 'Failed to generate vault wallet', 
-            details: error.message 
+        return Response.json({
+            success: false,
+            error: 'Failed to generate vault wallet',
+            details: error.message
         }, { status: 500 });
     }
 });

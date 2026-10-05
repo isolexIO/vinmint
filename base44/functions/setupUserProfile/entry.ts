@@ -1,8 +1,10 @@
+// Backend function: setupUserProfile
+// Uses shared solanaWallet module for PublicKey validation instead of @solana/web3.js
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.0';
-import { PublicKey } from 'npm:@solana/web3.js@1.78.5';
+import { isValidPublicKey } from '../../shared/solanaWallet.ts';
 
 // Create business domain from name
-const createBusinessDomain = (businessName) => {
+const createBusinessDomain = (businessName: string) => {
     return businessName
         .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
         .replace(/\s+/g, '') // Remove spaces
@@ -41,7 +43,6 @@ Deno.serve(async (req) => {
                 inviteRecord = invites[0];
                 if (new Date(inviteRecord.expires_at) > new Date()) {
                     isInvited = true;
-                    // Ensure the user type from token matches the one being submitted
                     if (inviteRecord.user_type !== profileData.user_type) {
                         return Response.json({ error: 'Invite token is for a different user type.' }, { status: 400 });
                     }
@@ -52,14 +53,11 @@ Deno.serve(async (req) => {
                 return Response.json({ error: 'Invalid or already used invite token.' }, { status: 400 });
             }
         }
-        // --- End Invite Token Validation ---
 
-        // Add strict validation for the wallet address
+        // Validate wallet address
         if (profileData.wallet_address) {
-            try {
-                new PublicKey(profileData.wallet_address);
-            } catch (e) {
-                return Response.json({ error: 'Invalid Solana wallet address format provided.', details: e.message }, { status: 400 });
+            if (!isValidPublicKey(profileData.wallet_address)) {
+                return Response.json({ error: 'Invalid Solana wallet address format provided.' }, { status: 400 });
             }
         } else {
             return Response.json({ error: 'Solana wallet address is required for profile setup.' }, { status: 400 });
@@ -78,34 +76,26 @@ Deno.serve(async (req) => {
                     latitude = geocodeResponse.data.latitude;
                     longitude = geocodeResponse.data.longitude;
                     console.log(`Geocoding successful: lat=${latitude}, lon=${longitude}`);
-                } else {
-                    console.warn(`Geocoding returned success=false for address: ${addressToGeocode}`);
                 }
             } catch (e) {
                 console.error("Geocoding failed during profile setup:", e.message);
-                // Continue without coordinates if geocoding fails
             }
         }
-        // --- End Geocode Address ---
 
         let shopId = null;
         let businessInvoice = null;
 
-        // Check if current user is admin - skip fees for admin-created accounts
         const isAdminCreating = user.user_type === 'admin';
-        
-        // Business registration fee for dealers and shop owners (unless invited or admin creating)
-        const businessRegistrationFee = 1500; // $150 in VIN tokens (assuming 1 VIN = $0.10)
+        const businessRegistrationFee = 1500;
         const usdRate = 0.10;
 
         if ((profileData.user_type === 'dealer' || profileData.user_type === 'shop_owner') && !isAdminCreating && !isInvited) {
-            // Create business registration invoice for dealer/shop (only if not admin creating or invited)
             const invoiceNumber = generateInvoiceNumber();
-            const businessName = profileData.user_type === 'dealer' 
+            const businessName = profileData.user_type === 'dealer'
                 ? (profileData.full_name || `Dealer_${user.id.substring(0, 8)}`)
                 : profileData.shop_data.shop_name;
             const businessDomain = createBusinessDomain(businessName);
-            
+
             businessInvoice = await base44.asServiceRole.entities.Invoice.create({
                 customer_id: user.id,
                 customer_email: user.email,
@@ -117,25 +107,24 @@ Deno.serve(async (req) => {
                 amount_usd: businessRegistrationFee * usdRate,
                 discount_applied: 0,
                 final_amount_vin: businessRegistrationFee,
-                payment_status: 'paid', // Auto-paid for demo
+                payment_status: 'paid',
                 payment_date: new Date().toISOString(),
                 transaction_hash: `SIM_BIZ_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 customer_type: profileData.user_type
             });
         }
 
-        // If shop owner, create shop
         if (profileData.user_type === 'shop_owner' && profileData.shop_data) {
             const certificationId = `CERT_${Date.now()}_${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
             const businessDomain = createBusinessDomain(profileData.shop_data.shop_name);
-            
+
             const shopPayload = {
                 ...profileData.shop_data,
                 certification_id: certificationId,
                 business_domain: businessDomain,
                 domain_nft_token_id: `DOM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 wallet_address: profileData.wallet_address,
-                status: isAdminCreating || isInvited ? 'approved' : 'pending', // Auto-approve if admin creates or invited
+                status: isAdminCreating || isInvited ? 'approved' : 'pending',
                 rating: 0,
                 total_services: 0,
                 latitude,
@@ -147,26 +136,25 @@ Deno.serve(async (req) => {
             const shop = await base44.asServiceRole.entities.CertifiedShop.create(shopPayload);
             shopId = shop.id;
         }
-        
-        let userUpdatePayload = {
+
+        let userUpdatePayload: Record<string, unknown> = {
             user_type: profileData.user_type,
             wallet_address: profileData.wallet_address,
             profile_completed: true,
             ...(shopId && { shop_id: shopId }),
             ...(businessInvoice && { registration_invoice_id: businessInvoice.id })
         };
-        
-        // If dealer, add geocoordinates, dealer status, and business domain
+
         if (profileData.user_type === 'dealer') {
             const businessName = profileData.full_name || `Dealer_${user.id.substring(0, 8)}`;
             const businessDomain = createBusinessDomain(businessName);
-            
+
             userUpdatePayload.latitude = latitude;
             userUpdatePayload.longitude = longitude;
             userUpdatePayload.address = profileData.address;
             userUpdatePayload.phone = profileData.phone;
             userUpdatePayload.business_license = profileData.business_license || `DLR_${Date.now()}`;
-            userUpdatePayload.dealer_status = isAdminCreating || isInvited ? 'approved' : 'pending'; // Auto-approve if admin creates or invited
+            userUpdatePayload.dealer_status = isAdminCreating || isInvited ? 'approved' : 'pending';
             userUpdatePayload.business_domain = businessDomain;
             userUpdatePayload.domain_nft_token_id = `DOM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         } else if (profileData.user_type === 'vehicle_owner') {
@@ -174,10 +162,8 @@ Deno.serve(async (req) => {
             userUpdatePayload.phone = profileData.phone;
         }
 
-        // Update user profile
         const updatedUser = await base44.asServiceRole.entities.User.update(user.id, userUpdatePayload);
 
-        // --- Mark invite as accepted ---
         if (isInvited && inviteRecord) {
             await base44.asServiceRole.entities.Invite.update(inviteRecord.id, {
                 status: 'accepted',
@@ -185,7 +171,6 @@ Deno.serve(async (req) => {
                 accepted_at: new Date().toISOString()
             });
         }
-        // --- End Mark invite ---
 
         return Response.json({
             success: true,
@@ -194,7 +179,7 @@ Deno.serve(async (req) => {
             business_domain: updatedUser.business_domain || (shopId ? createBusinessDomain(profileData.shop_data?.shop_name) : null),
             admin_created: isAdminCreating,
             invited: isInvited,
-            message: isAdminCreating 
+            message: isAdminCreating
                 ? "Profile setup completed successfully by admin (no fees applied)"
                 : isInvited
                     ? "Profile setup completed successfully via invite (no fees applied)"
@@ -203,9 +188,9 @@ Deno.serve(async (req) => {
 
     } catch (error) {
         console.error('Error setting up user profile:', error);
-        return Response.json({ 
-            error: 'Failed to setup profile', 
-            details: error.message 
+        return Response.json({
+            error: 'Failed to setup profile',
+            details: error.message
         }, { status: 500 });
     }
 });
