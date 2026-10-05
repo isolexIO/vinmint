@@ -1,29 +1,27 @@
 // Backend function: getWalletBalance
-// Uses direct Solana RPC fetch calls instead of @solana/web3.js to avoid Deno bundling issues
+// Uses direct Solana RPC fetch calls with authenticated endpoint from secrets
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.0';
+import { secrets } from 'base44:runtime';
 
-const SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";
 const VIN_TOKEN_MINT_ADDRESS = "DkorbGQdBUBcwFbXejktt3gxgBsM4YDENb5xoQzYC5xg";
 
 Deno.serve(async (req) => {
-    console.log("getWalletBalance function invoked (fetch-based).");
     try {
         const base44 = createClientFromRequest(req);
         const user = await base44.auth.me();
 
         if (!user) {
-            console.log("Unauthorized access attempt to getWalletBalance.");
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const { walletAddress } = await req.json();
 
         if (!walletAddress) {
-            console.error("Missing walletAddress in request body.");
             return Response.json({ error: 'Wallet address is required' }, { status: 400 });
         }
 
-        console.log(`Fetching balance for wallet: ${walletAddress}`);
+        const rpcUrl = secrets.get("SOLANA_RPC_URL");
+        const SOLANA_RPC_URL = rpcUrl || "https://api.mainnet-beta.solana.com";
 
         // Fetch SOL balance via RPC
         const solResponse = await fetch(SOLANA_RPC_URL, {
@@ -38,9 +36,8 @@ Deno.serve(async (req) => {
         });
         const solData = await solResponse.json();
         const solBalance = (solData.result?.value || 0) / 1_000_000_000;
-        console.log(`SOL balance: ${solBalance}`);
 
-        // Fetch VIN token balance via RPC (getTokenAccountsByOwner with mint filter)
+        // Fetch VIN token balance via RPC
         let vinTokenBalance = 0;
         let debugInfo: Record<string, unknown> = {};
 
@@ -73,29 +70,29 @@ Deno.serve(async (req) => {
                 }
             } else {
                 debugInfo.reason = 'no_token_account';
+                debugInfo.tokenRpcStatus = tokenResponse.status;
+                debugInfo.tokenRpcError = tokenData.error;
             }
         } catch (tokenError) {
-            console.log(`Token balance error: ${tokenError.message}`);
             debugInfo.error = tokenError.message;
             debugInfo.reason = 'fetch_error';
             vinTokenBalance = 0;
         }
 
-        const responsePayload = {
+        return Response.json({
             success: true,
             solBalance,
             vinTokenBalance,
             debug: debugInfo,
+            rpcUsed: SOLANA_RPC_URL.substring(0, 60),
+            solRpcStatus: solResponse.status,
+            solRpcError: solData.error,
             network: 'mainnet-beta',
             tokenProgram: 'Token 2022',
             timestamp: new Date().toISOString()
-        };
-
-        console.log("Successfully fetched balances:", responsePayload);
-        return Response.json(responsePayload);
+        });
 
     } catch (error) {
-        console.error('Critical error in getWalletBalance function:', error);
         return Response.json({
             success: false,
             error: 'Failed to fetch wallet balance',

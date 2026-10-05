@@ -3,8 +3,8 @@
 // Note: 'distribute' action requires transaction signing which needs @solana/web3.js.
 // For now, distribute returns an error directing the admin to use an external wallet.
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.0';
+import { secrets } from 'base44:runtime';
 
-const SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";
 const VIN_TOKEN_MINT_ADDRESS = "DkorbGQdBUBcwFbXejktt3gxgBsM4YDENb5xoQzYC5xg";
 
 Deno.serve(async (req) => {
@@ -28,6 +28,7 @@ Deno.serve(async (req) => {
         }
 
         const vaultPublicKey = vaultConfigs[0].public_key;
+        const SOLANA_RPC_URL = secrets.get("SOLANA_RPC_URL") || "https://api.mainnet-beta.solana.com";
 
         if (action === 'balance') {
             try {

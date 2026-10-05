@@ -2,8 +2,11 @@
 // Uses tweetnacl for Ed25519 keypair generation and direct RPC fetch calls for blockchain reads.
 
 import nacl from "npm:tweetnacl@1.0.3";
+import { secrets } from "base44:runtime";
 
-const SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";
+function getRpcUrl(): string {
+  return secrets.get("SOLANA_RPC_URL") || "https://api.mainnet-beta.solana.com";
+}
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 // --- Base58 encode/decode ---
@@ -86,7 +89,7 @@ export function isValidPublicKey(address: string): boolean {
 
 // --- RPC helpers ---
 async function rpcCall(method: string, params: unknown[]): Promise<unknown> {
-  const response = await fetch(SOLANA_RPC_URL, {
+  const response = await fetch(getRpcUrl(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -406,4 +409,4 @@ export async function transferVinTokens(
   );
 }
 
-export { SOLANA_RPC_URL, TOKEN_2022_PROGRAM_ID };
+export { getRpcUrl as SOLANA_RPC_URL, TOKEN_2022_PROGRAM_ID };
