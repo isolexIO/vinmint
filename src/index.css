@@ -156,3 +156,36 @@ button:focus-visible {
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile WebView Compatibility */
+html, body {
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Disable text selection on interactive UI elements */
+button,
+nav,
+[role="tab"],
+header,
+a {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Allow text selection in form inputs and content areas */
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+}

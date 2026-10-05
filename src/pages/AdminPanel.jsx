@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from "react";
 import { CertifiedShop } from "@/entities/CertifiedShop";
 import { Vehicle } from "@/entities/Vehicle";
@@ -661,7 +660,7 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-3 sm:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-3 sm:p-6 pb-20 md:pb-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col gap-4 mb-6 pt-4 sm:pt-8">
@@ -835,7 +834,7 @@ export default function AdminPanel() {
           </div>
 
           <TabsContent value="analytics">
-            <div className="grid lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* Customer Breakdown */}
               <Card className="bg-slate-800/70 border-purple-500/40 backdrop-blur-xl shadow-xl">
                 <CardHeader>
@@ -1554,7 +1553,7 @@ export default function AdminPanel() {
           </TabsContent>
 
           <TabsContent value="overview">
-            <div className="grid lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               <Card className="bg-slate-800/50 border-purple-500/20 backdrop-blur-xl">
                 <CardHeader>
                   <CardTitle className="text-white">Recent Platform Activity</CardTitle>

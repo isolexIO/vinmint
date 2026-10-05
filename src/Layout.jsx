@@ -25,7 +25,9 @@ import {
   LogOut,
   Map,
   Loader2, // Added Loader2 icon
-  RefreshCw // Added RefreshCw icon
+  RefreshCw, // Added RefreshCw icon
+  ArrowLeft,
+  LayoutDashboard
 } from "lucide-react";
 import {
   Sidebar,
@@ -54,6 +56,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import NotificationSystem from './components/NotificationSystem'; // Import NotificationSystem
+import MobileBottomTabs from '@/components/MobileBottomTabs';
 
 // Token logos components
 const SolanaLogoSmall = () => (
@@ -332,6 +335,16 @@ export default function Layout({ children, currentPageName }) {
     return [...baseItems, walletItem];
   };
 
+  const getDashboardUrl = () => {
+    if (!user) return createPageUrl("CustomerDashboard");
+    switch (user.user_type) {
+      case "admin": return createPageUrl("AdminPanel");
+      case "dealer": return createPageUrl("DealerDashboard");
+      case "shop_owner": return createPageUrl("ShopDashboard");
+      default: return createPageUrl("CustomerDashboard");
+    }
+  };
+
   const navigationItems = getNavigationItems();
 
   const handleLogin = () => {
@@ -364,8 +377,9 @@ export default function Layout({ children, currentPageName }) {
 
   if (isHomePage) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 pb-20 md:pb-0">
         {children}
+        <MobileBottomTabs dashboardUrl={getDashboardUrl()} />
       </div>
     );
   }
@@ -523,14 +537,24 @@ export default function Layout({ children, currentPageName }) {
         </Sidebar>
 
         <main className="flex-1 flex flex-col">
-          <header className="bg-slate-900/50 backdrop-blur-xl border-b border-purple-500/20 px-6 py-4 md:hidden">
-            <div className="flex items-center gap-4">
+          <header className="bg-slate-900/50 backdrop-blur-xl border-b border-purple-500/20 px-4 py-3 md:hidden safe-area-top sticky top-0 z-40">
+            <div className="flex items-center gap-3">
+              {location.pathname !== '/' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.history.back()}
+                  className="text-white hover:bg-purple-500/20 p-2 min-h-11 min-w-11"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              )}
               <SidebarTrigger className="hover:bg-purple-500/20 p-2 rounded-lg transition-colors duration-200 text-white" />
-              <h1 className="text-xl font-semibold text-white">VINmint</h1>
+              <h1 className="text-xl font-semibold text-white flex-1 truncate">VINmint</h1>
             </div>
           </header>
 
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto pb-20 md:pb-0">
             {children}
           </div>
         </main>
@@ -541,6 +565,9 @@ export default function Layout({ children, currentPageName }) {
           onClear={handleClearNotification}
           onClearAll={handleClearAllNotifications}
         />
+
+        {/* Mobile Bottom Tab Bar */}
+        <MobileBottomTabs dashboardUrl={getDashboardUrl()} />
       </div>
     </SidebarProvider>
   );

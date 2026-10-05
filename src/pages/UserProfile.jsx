@@ -1,12 +1,19 @@
-
 import React, { useState, useEffect } from "react";
-import { User } from "@/entities/User";
+import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { 
   User as UserIcon, 
   Wallet, 
@@ -19,7 +26,10 @@ import {
   Shield,
   Store,
   Building,
-  Car
+  Car,
+  Trash2,
+  AlertTriangle,
+  Loader2
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -29,6 +39,9 @@ export default function UserProfile() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [editData, setEditData] = useState({});
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadUserProfile();
@@ -36,7 +49,7 @@ export default function UserProfile() {
 
   const loadUserProfile = async () => {
     try {
-      const userData = await User.me();
+      const userData = await base44.auth.me();
       setUser(userData);
       setEditData({
         full_name: userData.full_name || "",
@@ -54,7 +67,7 @@ export default function UserProfile() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await User.updateMyUserData(editData);
+      await base44.auth.updateMe(editData);
       await loadUserProfile(); // Refresh user data
       setIsEditing(false);
       alert("Profile updated successfully!");
@@ -74,6 +87,20 @@ export default function UserProfile() {
       wallet_address: user.wallet_address || ""
     });
     setIsEditing(false);
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      await base44.entities.User.delete(user.id);
+      base44.auth.logout("/");
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      alert("Failed to delete account. Please contact support.");
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setDeleteConfirmText("");
+    }
   };
 
   const getUserTypeIcon = (userType) => {
@@ -272,10 +299,79 @@ export default function UserProfile() {
                   )}
                 </div>
               </div>
+
+              {/* Danger Zone - Delete Account */}
+              <div className="pt-6 border-t border-red-500/20">
+                <h3 className="text-lg font-semibold text-red-400 mb-4">Danger Zone</h3>
+                <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-lg">
+                  <div className="flex items-start gap-3 mb-4">
+                    <Trash2 className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-white font-medium mb-1">Delete Account</p>
+                      <p className="text-slate-400 text-sm">
+                        Permanently delete your account and all associated data. This action cannot be undone.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => setShowDeleteDialog(true)}
+                    variant="outline"
+                    className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete My Account
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </motion.div>
       </div>
+
+      {/* Delete Account Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="bg-slate-800 border-red-500/30 text-white max-w-[95vw] sm:max-w-md mx-4">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-red-400 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              Confirm Account Deletion
+            </DialogTitle>
+            <DialogDescription className="text-slate-300">
+              This action is <strong className="text-red-400">permanent and cannot be undone</strong>. All your data, including vehicles, service records, and wallet information, will be permanently deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg mb-4">
+              <p className="text-red-300 text-sm mb-3">
+                To confirm, type <strong className="text-white">DELETE</strong> below:
+              </p>
+              <Input
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="DELETE"
+                className="bg-slate-700/50 border-red-500/30 text-white"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setShowDeleteDialog(false); setDeleteConfirmText(""); }}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteAccount}
+              disabled={isDeleting || deleteConfirmText !== "DELETE"}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              {isDeleting ? "Deleting..." : "Permanently Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
