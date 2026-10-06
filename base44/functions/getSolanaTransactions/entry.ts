@@ -1,22 +1,18 @@
 // Backend function: getSolanaTransactions
 // Uses shared solanaWallet module (direct RPC fetch) instead of @solana/web3.js
-import { createClientFromRequest } from 'npm:@base44/sdk@0.7.0';
+
 import { getSignaturesForAddress, getParsedTransactions } from '../../shared/solanaWallet.ts';
 
-Deno.serve(async (req) => {
+export default async function(req) {
     console.log("getSolanaTransactions function invoked.");
     try {
-        const base44 = createClientFromRequest(req);
-        const user = await base44.auth.me();
-
-        if (!user) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
+        // Public blockchain history only. This does not authorize any private record access.
         const { walletAddress, limit = 10 } = await req.json();
-
-        if (!walletAddress) {
-            return Response.json({ error: 'Wallet address is required' }, { status: 400 });
+        if (typeof walletAddress !== 'string' || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(walletAddress)) {
+            return Response.json({ error: 'A valid Solana wallet address is required' }, { status: 400 });
+        }
+        if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
+            return Response.json({ error: 'History limit must be between 1 and 20' }, { status: 400 });
         }
 
         console.log(`Fetching transaction history for: ${walletAddress}`);
@@ -28,22 +24,22 @@ Deno.serve(async (req) => {
             return Response.json({ success: true, transactions: [], count: 0, network: 'mainnet-beta' });
         }
 
-        const signatureStrings = signatures.map((sig: any) => sig.signature);
+        const signatureStrings = signatures.map((sig) => sig.signature);
 
         // Chunk to avoid rate limits
         const chunkSize = 5;
-        const chunks: string[][] = [];
+        const chunks = [];
         for (let i = 0; i < signatureStrings.length; i += chunkSize) {
             chunks.push(signatureStrings.slice(i, i + chunkSize));
         }
 
-        let allParsedTransactions: any[] = [];
+        let allParsedTransactions = [];
         for (const chunk of chunks) {
             try {
                 const parsedChunk = await getParsedTransactions(chunk);
                 allParsedTransactions.push(...parsedChunk);
                 await new Promise(resolve => setTimeout(resolve, 500));
-            } catch (e: any) {
+            } catch (e) {
                 console.warn(`A chunk of transactions failed to load: ${e.message}`);
                 allParsedTransactions.push(...Array(chunk.length).fill(null));
             }
@@ -53,7 +49,7 @@ Deno.serve(async (req) => {
             if (!tx) return null;
 
             const walletAccountIndex = tx.transaction.message.accountKeys.findIndex(
-                (key: any) => key.pubkey === walletAddress
+                (key) => key.pubkey === walletAddress
             );
 
             let balanceChange = 0;
@@ -89,4 +85,4 @@ Deno.serve(async (req) => {
             details: error.message
         }, { status: 500 });
     }
-});
+}

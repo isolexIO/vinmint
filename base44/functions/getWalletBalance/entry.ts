@@ -2,24 +2,17 @@
 // Uses direct Solana RPC fetch calls with authenticated endpoint from secrets
 // Token balance is fetched via getAccountInfo on the ATA (computed by the caller)
 // to avoid rate-limited getTokenAccountsByOwner calls
-import { createClientFromRequest } from 'npm:@base44/sdk@0.7.0';
 import { secrets } from 'base44:runtime';
 
 const VIN_TOKEN_MINT_ADDRESS = "DkorbGQdBUBcwFbXejktt3gxgBsM4YDENb5xoQzYC5xg";
 
-Deno.serve(async (req) => {
+export default async function(req) {
     try {
-        const base44 = createClientFromRequest(req);
-        const user = await base44.auth.me();
-
-        if (!user) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
+        // Deliberately public, read-only Solana data. No private app data or keys are returned.
         const { walletAddress, ataAddress } = await req.json();
-
-        if (!walletAddress) {
-            return Response.json({ error: 'Wallet address is required' }, { status: 400 });
+        const isAddress = (value) => typeof value === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+        if (!isAddress(walletAddress) || (ataAddress && !isAddress(ataAddress))) {
+            return Response.json({ error: 'A valid Solana wallet address is required' }, { status: 400 });
         }
 
         const rpcUrl = secrets.get("SOLANA_RPC_URL");
@@ -42,7 +35,7 @@ Deno.serve(async (req) => {
         // Fetch VIN token balance via getAccountInfo on the ATA
         // This avoids the rate-limited getTokenAccountsByOwner method
         let vinTokenBalance = 0;
-        let debugInfo: Record<string, unknown> = {};
+        let debugInfo = {};
 
         if (ataAddress) {
             try {
@@ -139,4 +132,4 @@ Deno.serve(async (req) => {
             tokenProgram: 'Token 2022'
         }, { status: 500 });
     }
-});
+}

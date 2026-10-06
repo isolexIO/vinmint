@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useWallet } from '@/lib/WalletContext';
+import getWalletViewProfile from '@/components/wallet/getWalletViewProfile';
+import WalletOnlyNotice from '@/components/wallet/WalletOnlyNotice';
 import { Vehicle } from '@/entities/Vehicle';
 import { ServiceRecord } from '@/entities/ServiceRecord';
 import { generateAndSaveWallet } from '@/functions/generateAndSaveWallet.js';
@@ -60,6 +63,9 @@ const VinTokenLogo = () => (
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export default function WalletPage() {
+    const { walletAddress, autoKeypair } = useWallet();
+    const [hasAccount, setHasAccount] = useState(false);
+    const [accountWallet, setAccountWallet] = useState(null);
     const [user, setUser] = useState(null);
     const [transactions, setTransactions] = useState([]);
     const [vinNfts, setVinNfts] = useState([]);
@@ -96,7 +102,7 @@ export default function WalletPage() {
         }
     }, []);
 
-    const fetchBalances = useCallback(async (walletAddress) => {
+    const fetchBalances = useCallback(async (walletAddress, updateAccount = false) => {
         if (!walletAddress) return;
         
         setIsBalanceLoading(true);
@@ -112,15 +118,15 @@ export default function WalletPage() {
                 console.log("Setting new balances:", newBalances);
                 setBalances(newBalances);
 
-                // Update user entity with live balances for sidebar
-                try {
-                    await base44.auth.updateMe({
-                        solana_balance: newBalances.sol,
-                        vin_token_balance: newBalances.vin
-                    });
-                } catch (updateError) {
-                    console.warn("Failed to update user balances:", updateError);
-                    // Don't fail the whole process if this fails
+                if (updateAccount) {
+                    try {
+                        await base44.auth.updateMe({
+                            solana_balance: newBalances.sol,
+                            vin_token_balance: newBalances.vin
+                        });
+                    } catch (updateError) {
+                        console.warn("Failed to update user balances:", updateError);
+                    }
                 }
             } else {
                 console.error("Balance fetch failed:", response.data?.error);
@@ -174,9 +180,15 @@ export default function WalletPage() {
         setHasErrors(false);
         
         try {
-            // First, load user data
-            const userData = await base44.auth.me();
+            const authenticated = await base44.auth.isAuthenticated();
+            const account = authenticated ? await base44.auth.me() : null;
+            setHasAccount(Boolean(account));
+            setAccountWallet(account?.wallet_address || null);
+            const address = walletAddress || account?.wallet_address;
+            const userData = account ? { ...account, wallet_address: address } : getWalletViewProfile(address);
             setUser(userData);
+            setVinNfts([]);
+            setServiceNfts([]);
             
             if (!userData || !userData.wallet_address) {
                 setIsLoading(false);
@@ -188,7 +200,11 @@ export default function WalletPage() {
             await delay(500); // Small delay
 
             // Then load balances
-            await fetchBalances(userData.wallet_address);
+            await fetchBalances(userData.wallet_address, Boolean(account && account.wallet_address === userData.wallet_address));
+            if (!account) {
+                await fetchTransactions(userData.wallet_address);
+                return;
+            }
             await delay(1000); // Delay before next batch
 
             // Load NFT data with error handling
@@ -219,12 +235,12 @@ export default function WalletPage() {
 
         } catch (error) {
             console.error("Error loading wallet data:", error);
-            setUser(null);
+            setUser(getWalletViewProfile(walletAddress));
             setHasErrors(true);
         } finally {
             setIsLoading(false);
         }
-    }, [fetchBalances, fetchPrices, fetchTransactions]);
+    }, [fetchBalances, fetchPrices, fetchTransactions, walletAddress]);
 
     useEffect(() => {
         loadWalletData();
@@ -250,6 +266,10 @@ export default function WalletPage() {
         setPrivateKey(null);
         
         try {
+            if (autoKeypair?.publicKey.toString() === user?.wallet_address) {
+                setPrivateKey(Array.from(autoKeypair.secretKey));
+                return;
+            }
             const response = await getPrivateKey();
             if (response.data.success) {
                 setPrivateKey(response.data.private_key);
@@ -298,16 +318,16 @@ export default function WalletPage() {
                      <CardHeader>
                          <CardTitle className="text-2xl text-red-400 flex items-center gap-3">
                              <AlertTriangle className="w-8 h-8" />
-                             Authentication Required
+                             Wallet Unavailable
                          </CardTitle>
                      </CardHeader>
                      <CardContent>
-                         <p className="text-slate-300">You must be logged in to access your wallet. Please sign in to continue.</p>
+                         <p className="text-slate-300">Reconnect your Solana wallet to view its public balances and history.</p>
                          <Button 
-                             onClick={() => base44.auth.redirectToLogin(window.location.href)}
+                             onClick={() => { window.location.href = '/WalletLogin?next=%2FWallet'; }}
                              className="mt-4 w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white"
                          >
-                             Sign In to View Wallet
+                             Connect Wallet
                              </Button>
                      </CardContent>
                  </Card>
@@ -341,6 +361,8 @@ export default function WalletPage() {
     }
 
     const totalUsdValue = (balances.sol * prices.sol) + (balances.vin * prices.vin);
+    const canUseAccountWallet = hasAccount && accountWallet === user.wallet_address;
+    const canRevealKey = canUseAccountWallet || autoKeypair?.publicKey.toString() === user.wallet_address;
 
     return (
         <>
@@ -400,6 +422,7 @@ export default function WalletPage() {
                     <div className="mb-8 pt-8">
                         <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-300 bg-clip-text text-transparent">My Wallet</h1>
                         <p className="text-slate-300 text-lg">Manage your digital assets on the VINmint network.</p>
+                        {!hasAccount && <WalletOnlyNotice />}
                         {hasErrors && (
                             <Alert className="bg-yellow-500/10 border-yellow-500/20 text-yellow-300 mt-4">
                                 <AlertTriangle className="h-4 w-4 text-yellow-500" />
@@ -438,7 +461,7 @@ export default function WalletPage() {
                                             <ExternalLink className="w-4 h-4 mr-2" />
                                             Solscan
                                         </Button>
-                                        <Button onClick={handleShowPrivateKey} variant="destructive" className="flex-1 bg-red-900/50 text-red-300 hover:bg-red-900">
+                                        <Button onClick={handleShowPrivateKey} disabled={!canRevealKey} variant="destructive" className="flex-1 bg-red-900/50 text-red-300 hover:bg-red-900">
                                             <KeyRound className="w-4 h-4 mr-2" />
                                             Key
                                         </Button>
@@ -455,10 +478,10 @@ export default function WalletPage() {
                           Tokens & Actions
                         </TabsTrigger>
                         <TabsTrigger value="vin_nfts" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white text-slate-300">
-                          VIN NFTs ({vinNfts.length})
+                          VIN NFTs ({hasAccount ? vinNfts.length : '—'})
                         </TabsTrigger>
                         <TabsTrigger value="service_nfts" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white text-slate-300">
-                          Service NFTs ({serviceNfts.length})
+                          Service NFTs ({hasAccount ? serviceNfts.length : '—'})
                         </TabsTrigger>
                       </TabsList>
 
@@ -553,11 +576,11 @@ export default function WalletPage() {
                                     <p className="text-slate-400 text-sm">Available operations for your wallet</p>
                                 </CardHeader>
                                 <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                   <Button onClick={() => setShowTransferModal(true)} className="bg-gradient-to-r from-purple-600 to-blue-600 text-white h-20 flex-col text-sm gap-1">
+                                   <Button onClick={() => setShowTransferModal(true)} disabled={!canUseAccountWallet} title={!canUseAccountWallet ? 'App-managed transfers require the matching account wallet session.' : undefined} className="bg-gradient-to-r from-purple-600 to-blue-600 text-white h-20 flex-col text-sm gap-1">
                                         <ArrowUpCircle className="w-6 h-6" />
                                         Send Tokens
                                     </Button>
-                                    <Button onClick={() => setShowBuyVinModal(true)} className="bg-gradient-to-r from-amber-500 to-orange-600 text-white h-20 flex-col text-sm gap-1 hover:from-amber-400 hover:to-orange-500">
+                                    <Button onClick={() => setShowBuyVinModal(true)} disabled={!canUseAccountWallet} title={!canUseAccountWallet ? 'App-managed purchases require the matching account wallet session.' : undefined} className="bg-gradient-to-r from-amber-500 to-orange-600 text-white h-20 flex-col text-sm gap-1 hover:from-amber-400 hover:to-orange-500">
                                         <ShoppingCart className="w-6 h-6" />
                                         Buy VIN
                                     </Button>
@@ -661,7 +684,7 @@ export default function WalletPage() {
                                 ))}
                               </div>
                             ) : (
-                              <p className="text-slate-400 text-center py-8">You do not own any VIN NFTs yet. Register a vehicle to get started!</p>
+                              <p className="text-slate-400 text-center py-8">{hasAccount ? 'You do not own any VIN NFTs yet. Register a vehicle to get started!' : 'Private VINmint NFT records are not loaded in a wallet-only session.'}</p>
                             )}
                           </CardContent>
                         </Card>
@@ -689,7 +712,7 @@ export default function WalletPage() {
                                 ))}
                               </div>
                             ) : (
-                              <p className="text-slate-400 text-center py-8">You have not received any Service NFTs yet.</p>
+                              <p className="text-slate-400 text-center py-8">{hasAccount ? 'You have not received any Service NFTs yet.' : 'Private service NFT records are not loaded in a wallet-only session.'}</p>
                             )}
                           </CardContent>
                         </Card>

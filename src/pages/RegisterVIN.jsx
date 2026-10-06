@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Vehicle } from "@/entities/Vehicle";
 import { User } from "@/entities/User";
+import { useWallet } from "@/lib/WalletContext";
+import getWalletViewProfile from "@/components/wallet/getWalletViewProfile";
+import WalletOnlyNotice from "@/components/wallet/WalletOnlyNotice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +41,8 @@ const VinTokenLogo = () => (
 );
 
 export default function RegisterVIN() {
+  const { walletAddress } = useWallet();
+  const [hasAccount, setHasAccount] = useState(false);
   const [formData, setFormData] = useState({
     vin: "",
     make: "",
@@ -59,26 +64,26 @@ export default function RegisterVIN() {
   const registrationFeeVIN = 490; // 490 VIN tokens
   const registrationFeeUSD = 49.00; // $49.00 USD
 
-  // Load user data and wallet balance on component mount
+  // A wallet-only view can read public chain data, not private account records.
   useEffect(() => {
+    let stopped = false;
     const loadUserData = async () => {
-        try {
-            const userData = await User.me();
-            setUser(userData);
-            
-            if (userData.wallet_address) {
-              await loadWalletBalance(userData.wallet_address);
-            }
-        } catch(e) {
-            console.error("User not logged in or failed to load user", e);
-            setErrorMessage("Your account session could not be loaded. Please sign in again to continue.");
-            if (e.status === 401 || e.response?.status === 401) {
-              User.redirectToLogin(window.location.href);
-            }
-        }
+      try {
+        const authenticated = await User.isAuthenticated();
+        const account = authenticated ? await User.me() : null;
+        if (stopped) return;
+        setHasAccount(Boolean(account));
+        const address = walletAddress || account?.wallet_address;
+        const view = account ? { ...account, wallet_address: address } : getWalletViewProfile(address);
+        setUser(view);
+        if (address) await loadWalletBalance(address);
+      } catch (error) {
+        if (!stopped) setErrorMessage(error.message || "Could not load your wallet.");
+      }
     };
     loadUserData();
-  }, []);
+    return () => { stopped = true; };
+  }, [walletAddress]);
 
   const loadWalletBalance = async (walletAddress) => {
     setIsLoadingBalance(true);
@@ -166,6 +171,11 @@ export default function RegisterVIN() {
   };
 
   const handleSubmit = async () => {
+    if (!hasAccount) {
+      setErrorMessage("Saving a VIN registration currently requires an account session. No payment or registration has been made.");
+      setStep("input");
+      return;
+    }
     setIsLoading(true); // Renamed from isSubmitting
     setStep("checking");
     setErrorMessage(""); // Clear previous errors
@@ -434,6 +444,7 @@ export default function RegisterVIN() {
                   </Alert>
                 )}
 
+                {!hasAccount && <WalletOnlyNotice />}
                 <form onSubmit={handleProceedToPayment} className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="md:col-span-2">
@@ -577,7 +588,7 @@ export default function RegisterVIN() {
 
                   <Button
                     type="submit"
-                    disabled={isLoading || !validateVIN(formData.vin) || !formData.make || !formData.model || !formData.year || (!formData.owner_wallet && !user?.wallet_address) || walletBalance.vin < registrationFeeVIN}
+                    disabled={!hasAccount || isLoading || isLoadingBalance || !validateVIN(formData.vin) || !formData.make || !formData.model || !formData.year || (!formData.owner_wallet && !user?.wallet_address) || walletBalance.vin < registrationFeeVIN}
                     className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white py-4 text-lg font-semibold shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 border-0"
                   >
                     <Shield className="w-5 h-5 mr-2" />

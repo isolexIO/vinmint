@@ -1,8 +1,10 @@
-
 import React, { useState, useEffect } from "react";
 import { Vehicle } from "@/entities/Vehicle";
 import { ServiceRecord } from "@/entities/ServiceRecord";
 import { User } from "@/entities/User";
+import { useWallet } from "@/lib/WalletContext";
+import getWalletViewProfile from "@/components/wallet/getWalletViewProfile";
+import WalletOnlyNotice from "@/components/wallet/WalletOnlyNotice";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -129,6 +131,8 @@ function VehicleCard({ vehicle, isOwner, onClick }) {
 }
 
 export default function CustomerDashboard() {
+  const { walletAddress } = useWallet();
+  const [hasAccount, setHasAccount] = useState(false);
   const [vehicles, setVehicles] = useState([]);
   const [serviceRecords, setServiceRecords] = useState([]);
   const [user, setUser] = useState(null);
@@ -139,13 +143,21 @@ export default function CustomerDashboard() {
   useEffect(() => {
     loadDashboardData();
     fetchSolanaPrice();
-  }, []);
+  }, [walletAddress]);
 
   const loadDashboardData = async () => {
     setIsLoading(true);
     try {
+      const authenticated = await User.isAuthenticated();
+      setHasAccount(authenticated);
+      if (!authenticated) {
+        setUser(getWalletViewProfile(walletAddress));
+        setVehicles([]);
+        setServiceRecords([]);
+        return;
+      }
       const currentUser = await User.me();
-      setUser(currentUser);
+      setUser({ ...currentUser, wallet_address: walletAddress || currentUser.wallet_address });
 
       if (currentUser && (currentUser.wallet_address || currentUser.user_type === 'admin')) {
         if (currentUser.user_type === 'admin') {
@@ -261,6 +273,7 @@ export default function CustomerDashboard() {
           </Link>
         </div>
 
+        {!hasAccount && <WalletOnlyNotice />}
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
           <motion.div
@@ -276,7 +289,7 @@ export default function CustomerDashboard() {
                   </div>
                   <div>
                     <p className="text-slate-400 text-xs md:text-sm">Vehicles</p>
-                    <p className="text-xl md:text-2xl font-bold text-white">{vehicles.length}</p>
+                    <p className="text-xl md:text-2xl font-bold text-white">{hasAccount ? vehicles.length : '—'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -296,7 +309,7 @@ export default function CustomerDashboard() {
                   </div>
                   <div>
                     <p className="text-slate-400 text-xs md:text-sm">Services</p>
-                    <p className="text-xl md:text-2xl font-bold text-white">{serviceRecords.length}</p>
+                    <p className="text-xl md:text-2xl font-bold text-white">{hasAccount ? serviceRecords.length : '—'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -317,7 +330,7 @@ export default function CustomerDashboard() {
                   </div>
                   <div>
                     <p className="text-slate-400 text-xs md:text-sm">Total Spent</p>
-                    <p className="text-lg md:text-2xl font-bold text-white">${totalSpent.toFixed(2)}</p>
+                    <p className="text-lg md:text-2xl font-bold text-white">{hasAccount ? `$${totalSpent.toFixed(2)}` : '—'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -338,7 +351,7 @@ export default function CustomerDashboard() {
                   </div>
                   <div>
                     <p className="text-slate-400 text-xs md:text-sm">Avg Cost</p>
-                    <p className="text-lg md:text-2xl font-bold text-white">${avgServiceCost.toFixed(2)}</p>
+                    <p className="text-lg md:text-2xl font-bold text-white">{hasAccount ? `$${avgServiceCost.toFixed(2)}` : '—'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -396,9 +409,9 @@ export default function CustomerDashboard() {
             {vehicles.length === 0 && (
               <div className="text-center py-8 md:py-12">
                 <Car className="w-12 h-12 md:w-16 md:h-16 text-slate-600 mx-auto mb-4" />
-                <h3 className="text-lg md:text-xl font-semibold text-slate-400 mb-2">No vehicles registered yet</h3>
+                <h3 className="text-lg md:text-xl font-semibold text-slate-400 mb-2">{hasAccount ? 'No vehicles registered yet' : 'Wallet connected'}</h3>
                 <p className="text-slate-500 mb-6 text-sm md:text-base px-4">
-                  Register your first VIN to get started with blockchain vehicle identity.
+                  {hasAccount ? 'Register your first VIN to get started with blockchain vehicle identity.' : 'Your private vehicle records are not loaded in a wallet-only session.'}
                 </p>
                 <Link to={createPageUrl("RegisterVIN")}>
                   <Button className="bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-500 hover:to-blue-500 transition-all duration-300">
@@ -419,9 +432,9 @@ export default function CustomerDashboard() {
                 {recentServices.length === 0 ? (
                   <div className="text-center py-8 md:py-12">
                     <Wrench className="w-12 h-12 md:w-16 md:h-16 text-slate-600 mx-auto mb-4" />
-                    <h3 className="text-lg md:text-xl font-semibold text-slate-400 mb-2">No service records yet</h3>
+                    <h3 className="text-lg md:text-xl font-semibold text-slate-400 mb-2">{hasAccount ? 'No service records yet' : 'Private service records unavailable'}</h3>
                     <p className="text-slate-500 text-sm md:text-base">
-                      Service records will appear here when certified shops perform work on your vehicles
+                      {hasAccount ? 'Service records will appear here when certified shops perform work on your vehicles' : 'Wallet connection alone does not grant access to private account records.'}
                     </p>
                   </div>
                 ) : (

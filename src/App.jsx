@@ -10,7 +10,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { WalletProvider } from '@/lib/WalletContext';
 import AdapterWalletProvider from '@/components/wallet/AdapterWalletProvider';
-import AccountAccess from '@/components/wallet/AccountAccess';
+import WalletAccess from '@/components/wallet/WalletAccess';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import { ThemeProvider } from "next-themes";
 
@@ -49,7 +49,7 @@ const AuthenticatedApp = () => {
           path={`/${path}`}
           element={
             <LayoutWrapper currentPageName={path}>
-              {accountPages.has(path) ? <AccountAccess><Page /></AccountAccess> : <Page />}
+              {accountPages.has(path) ? <WalletAccess><Page /></WalletAccess> : <Page />}
             </LayoutWrapper>
           }
         />
