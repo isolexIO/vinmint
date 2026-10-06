@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
+import { useWallet } from "@/lib/WalletContext";
 import { Vehicle } from "@/entities/Vehicle";
 import { CertifiedShop } from "@/entities/CertifiedShop";
 import { ServiceRecord } from "@/entities/ServiceRecord";
@@ -72,16 +73,23 @@ const VinTokenLogoSmall = () => (
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { walletAddress, isConnected, disconnect } = useWallet();
   const [liveStats, setLiveStats] = useState({
     vehicles: 0,
     shops: 0,
     serviceRecords: 0
   });
-  const [liveBalances, setLiveBalances] = useState({ sol: 0, vin: 0 }); // New state for live balances
-  const [isBalanceLoading, setIsBalanceLoading] = useState(false); // New state for balance loading
+  const [liveBalances, setLiveBalances] = useState({ sol: 0, vin: 0 });
+  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [notifications, setNotifications] = useState([]);
+
+  const getWalletProfile = () => {
+    if (!walletAddress) return null;
+    try {
+      const data = localStorage.getItem(`vinmint_profile_${walletAddress}`);
+      return data ? JSON.parse(data) : null;
+    } catch { return null; }
+  };
 
   const isHomePage = location.pathname === createPageUrl("Home") || currentPageName === "Home";
 
@@ -97,12 +105,6 @@ export default function Layout({ children, currentPageName }) {
           sol: solBalance,
           vin: vinTokenBalance
         });
-        
-        // Update user data with live balances
-        await base44.auth.updateMe({
-          solana_balance: solBalance,
-          vin_token_balance: vinTokenBalance
-        });
       }
     } catch (error) {
       console.error("Error fetching live balances:", error);
@@ -111,22 +113,14 @@ export default function Layout({ children, currentPageName }) {
     }
   }, []);
 
-  const loadUser = useCallback(async () => {
-    try {
-      const userData = await base44.auth.me();
-      setUser(userData);
-      
-      // If user has a wallet, fetch live balances
-      if (userData?.wallet_address) {
-        fetchLiveBalances(userData.wallet_address);
-      }
-    } catch (error) {
-      console.log("User not authenticated");
-      setUser(null); // Ensure user is null if not authenticated
-    } finally {
-      setIsLoading(false);
+  // Wallet-based: fetch balances when wallet address changes
+  useEffect(() => {
+    if (walletAddress) {
+      fetchLiveBalances(walletAddress);
+    } else {
+      setLiveBalances({ sol: 0, vin: 0 });
     }
-  }, [fetchLiveBalances]);
+  }, [walletAddress, fetchLiveBalances]);
 
   const loadLiveStats = useCallback(async () => {
     try {
@@ -161,27 +155,16 @@ export default function Layout({ children, currentPageName }) {
   }, []);
 
   useEffect(() => {
-    loadUser();
-  }, [loadUser]);
-
-  useEffect(() => {
-      if (user?.id) {
-          fetchNotifications(user.id);
-          const intervalId = setInterval(() => fetchNotifications(user.id), 60000); // Poll every 60 seconds
-          return () => clearInterval(intervalId);
-      }
-  }, [user, fetchNotifications]);
-
-  useEffect(() => {
-    // Redirect logic remains unchanged
-    if (user && !user.profile_completed && user.user_type !== 'admin' && !isHomePage && location.pathname !== createPageUrl("ProfileSetup")) {
-      window.location.href = createPageUrl("ProfileSetup");
+    if (walletAddress) {
+      fetchNotifications(walletAddress);
+      const intervalId = setInterval(() => fetchNotifications(walletAddress), 60000);
+      return () => clearInterval(intervalId);
     }
-  }, [user, location, isHomePage]);
+  }, [walletAddress, fetchNotifications]);
 
   const refreshBalances = () => {
-    if (user?.wallet_address) {
-      fetchLiveBalances(user.wallet_address);
+    if (walletAddress) {
+      fetchLiveBalances(walletAddress);
     }
   };
   
@@ -193,151 +176,55 @@ export default function Layout({ children, currentPageName }) {
       setNotifications([]);
   };
   
-  // Different navigation items based on user type
   const getNavigationItems = () => {
     const baseItems = [
-      {
-        title: "Home",
-        url: createPageUrl("Home"),
-        icon: Home,
-      },
-      {
-        title: "Explorer", 
-        url: createPageUrl("Explorer"),
-        icon: Search,
-      },
-      {
-        title: "Network Map",
-        url: createPageUrl("Map"),
-        icon: Map
-      }
+      { title: "Home", url: createPageUrl("Home"), icon: Home },
+      { title: "Explorer", url: createPageUrl("Explorer"), icon: Search },
+      { title: "Network Map", url: createPageUrl("Map"), icon: Map }
     ];
 
-    if (!user) {
-      return baseItems;
-    }
-    
-    // Admin users get full access regardless of profile completion
-    if (user.user_type === "admin") {
-      return [
-        ...baseItems,
-        {
-          title: "My Wallet",
-          url: createPageUrl("Wallet"),
-          icon: Wallet
-        },
-        {
-          title: "Register VIN",
-          url: createPageUrl("RegisterVIN"),
-          icon: PlusCircle,
-        },
-        {
-          title: "Customer Dashboard",
-          url: createPageUrl("CustomerDashboard"),
-          icon: Car,
-        },
-        {
-          title: "Dealer Dashboard",
-          url: createPageUrl("DealerDashboard"),
-          icon: Building,
-        },
-        {
-          title: "Shop Dashboard",
-          url: createPageUrl("ShopDashboard"),
-          icon: Store,
-        },
-        {
-          title: "Admin Panel",
-          url: createPageUrl("AdminPanel"),
-          icon: Shield,
-        },
-        {
-          title: "My Profile",
-          url: createPageUrl("UserProfile"),
-          icon: UserIcon,
-        }
-      ];
-    }
-    
-    // All authenticated users should see wallet option
-    const walletItem = {
-      title: "My Wallet",
-      url: createPageUrl("Wallet"),
-      icon: Wallet
-    };
+    if (!isConnected) return baseItems;
 
-    // Non-admin users who haven't completed their profile only see base items + wallet
-    if (!user.profile_completed) {
-      return [...baseItems, walletItem];
+    const profile = getWalletProfile();
+    const walletItem = { title: "My Wallet", url: createPageUrl("Wallet"), icon: Wallet };
+    const profileItem = { title: "My Profile", url: createPageUrl("UserProfile"), icon: UserIcon };
+    const registerItem = { title: "Register VIN", url: createPageUrl("RegisterVIN"), icon: PlusCircle };
+
+    if (!profile) {
+      return [...baseItems, walletItem, registerItem, profileItem];
     }
 
-    if (user.user_type === "vehicle_owner") {
-      return [
-        ...baseItems,
-        walletItem,
-        {
-          title: "Register VIN",
-          url: createPageUrl("RegisterVIN"),
-          icon: PlusCircle,
-        },
-        {
-          title: "My Dashboard",
-          url: createPageUrl("CustomerDashboard"),
-          icon: Car,
-        },
-        {
-          title: "My Profile",
-          url: createPageUrl("UserProfile"),
-          icon: UserIcon,
-        }
-      ];
+    switch (profile.user_type) {
+      case "admin":
+        return [...baseItems, walletItem, registerItem,
+          { title: "Customer Dashboard", url: createPageUrl("CustomerDashboard"), icon: Car },
+          { title: "Dealer Dashboard", url: createPageUrl("DealerDashboard"), icon: Building },
+          { title: "Shop Dashboard", url: createPageUrl("ShopDashboard"), icon: Store },
+          { title: "Admin Panel", url: createPageUrl("AdminPanel"), icon: Shield },
+          profileItem
+        ];
+      case "dealer":
+        return [...baseItems, walletItem, registerItem,
+          { title: "Dealer Dashboard", url: createPageUrl("DealerDashboard"), icon: Building },
+          profileItem
+        ];
+      case "shop_owner":
+        return [...baseItems, walletItem,
+          { title: "Shop Dashboard", url: createPageUrl("ShopDashboard"), icon: Store },
+          profileItem
+        ];
+      default:
+        return [...baseItems, walletItem, registerItem,
+          { title: "My Dashboard", url: createPageUrl("CustomerDashboard"), icon: Car },
+          profileItem
+        ];
     }
-
-    if (user.user_type === "dealer") {
-      return [
-        ...baseItems,
-        walletItem,
-        {
-          title: "Register VIN",
-          url: createPageUrl("RegisterVIN"),
-          icon: PlusCircle,
-        },
-        {
-          title: "Dealer Dashboard",
-          url: createPageUrl("DealerDashboard"),
-          icon: Building,
-        },
-        {
-          title: "My Profile",
-          url: createPageUrl("UserProfile"),
-          icon: UserIcon,
-        }
-      ];
-    }
-
-    if (user.user_type === "shop_owner") {
-      return [
-        ...baseItems,
-        walletItem,
-        {
-          title: "Shop Dashboard",
-          url: createPageUrl("ShopDashboard"),
-          icon: Store,
-        },
-        {
-          title: "My Profile",
-          url: createPageUrl("UserProfile"),
-          icon: UserIcon,
-        }
-      ];
-    }
-
-    return [...baseItems, walletItem];
   };
 
   const getDashboardUrl = () => {
-    if (!user) return createPageUrl("CustomerDashboard");
-    switch (user.user_type) {
+    if (!isConnected) return createPageUrl("WalletLogin");
+    const profile = getWalletProfile();
+    switch (profile?.user_type) {
       case "admin": return createPageUrl("AdminPanel");
       case "dealer": return createPageUrl("DealerDashboard");
       case "shop_owner": return createPageUrl("ShopDashboard");
@@ -347,33 +234,15 @@ export default function Layout({ children, currentPageName }) {
 
   const navigationItems = getNavigationItems();
 
-  const handleLogin = () => {
-    base44.auth.redirectToLogin(window.location.href);
-  };
-
   const handleLogout = () => {
-    base44.auth.logout(createPageUrl("Home"));
+    disconnect();
+    window.location.href = createPageUrl("Home");
   };
-  
-  // handleDisconnect function has been removed.
 
   const copyAddress = (address) => {
     navigator.clipboard.writeText(address);
     alert("Address copied to clipboard!");
   };
-
-  if (isLoading && !isHomePage) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Car className="w-8 h-8 text-white animate-pulse" />
-          </div>
-          <p className="text-white text-xl">Loading VINmint...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (isHomePage) {
     return (
@@ -435,100 +304,83 @@ export default function Layout({ children, currentPageName }) {
           </SidebarContent>
 
           <SidebarFooter className="border-t border-purple-500/30 p-4 bg-slate-950/90 flex flex-col gap-4">
-            {user ? (
-              user.wallet_address ? (
-                <div className="space-y-3">
-                  <div className="p-3 bg-slate-800/50 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
-                          <Wallet className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white text-sm font-medium">Wallet Connected</p>
-                          <p className="text-slate-300 text-xs truncate">
-                            {user.wallet_address}
-                          </p>
-                        </div>
+            {isConnected ? (
+              <div className="space-y-3">
+                <div className="p-3 bg-slate-800/50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <Wallet className="w-4 h-4 text-white" />
                       </div>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        onClick={refreshBalances}
-                        disabled={isBalanceLoading}
-                        className="text-slate-400 hover:text-white p-1 flex-shrink-0"
-                      >
-                        <RefreshCw className={`w-3 h-3 ${isBalanceLoading ? 'animate-spin' : ''}`} />
-                      </Button>
-                    </div>
-                    
-                    {/* Live Balances */}
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                      <div className="flex flex-col items-center p-2 bg-slate-700/50 rounded-md">
-                        <div className="flex items-center gap-1 mb-1">
-                          <SolanaLogoSmall />
-                          <span className="text-slate-400 text-xs">SOL</span>
-                        </div>
-                        {isBalanceLoading ? (
-                          <Loader2 className="w-3 h-3 animate-spin text-purple-400" />
-                        ) : (
-                          <span className="font-semibold text-green-300 text-xs">
-                            {liveBalances.sol.toFixed(4)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-center p-2 bg-slate-700/50 rounded-md">
-                        <div className="flex items-center gap-1 mb-1">
-                          <VinTokenLogoSmall />
-                          <span className="text-slate-400 text-xs">VIN</span>
-                        </div>
-                        {isBalanceLoading ? (
-                          <Loader2 className="w-3 h-3 animate-spin text-green-400" />
-                        ) : (
-                          <span className="font-semibold text-blue-300 text-xs">
-                            {liveBalances.vin.toFixed(6)}
-                          </span>
-                        )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-medium">Wallet Connected</p>
+                        <p className="text-slate-300 text-xs truncate">
+                          {walletAddress}
+                        </p>
                       </div>
                     </div>
-                    
-                    {/* Copy button */}
-                    <div className="mt-3">
-                       <Button size="sm" variant="secondary" onClick={() => copyAddress(user.wallet_address)} className="w-full text-slate-300 bg-slate-700/50 hover:bg-slate-700">
-                          <Copy className="w-4 h-4 mr-2" /> Copy Address
-                       </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={refreshBalances}
+                      disabled={isBalanceLoading}
+                      className="text-slate-400 hover:text-white p-1 flex-shrink-0"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isBalanceLoading ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
+                  
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex flex-col items-center p-2 bg-slate-700/50 rounded-md">
+                      <div className="flex items-center gap-1 mb-1">
+                        <SolanaLogoSmall />
+                        <span className="text-slate-400 text-xs">SOL</span>
+                      </div>
+                      {isBalanceLoading ? (
+                        <Loader2 className="w-3 h-3 animate-spin text-purple-400" />
+                      ) : (
+                        <span className="font-semibold text-green-300 text-xs">
+                          {liveBalances.sol.toFixed(4)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-center p-2 bg-slate-700/50 rounded-md">
+                      <div className="flex items-center gap-1 mb-1">
+                        <VinTokenLogoSmall />
+                        <span className="text-slate-400 text-xs">VIN</span>
+                      </div>
+                      {isBalanceLoading ? (
+                        <Loader2 className="w-3 h-3 animate-spin text-green-400" />
+                      ) : (
+                        <span className="font-semibold text-blue-300 text-xs">
+                          {liveBalances.vin.toFixed(6)}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <Button 
-                    onClick={handleLogout}
-                    className="w-full bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    <LogOut className="w-4 h-4 mr-2" /> Logout
-                  </Button>
+                  
+                  <div className="mt-3">
+                     <Button size="sm" variant="secondary" onClick={() => copyAddress(walletAddress)} className="w-full text-slate-300 bg-slate-700/50 hover:bg-slate-700">
+                        <Copy className="w-4 h-4 mr-2" /> Copy Address
+                     </Button>
+                  </div>
                 </div>
-              ) : (
-                 <div className="space-y-3">
-                    <Link to={createPageUrl("Wallet")} className="w-full">
-                      <Button className="w-full bg-gradient-to-r from-blue-600 to-sky-600 text-white">
-                          <Wallet className="w-4 h-4 mr-2"/> Create Wallet
-                      </Button>
-                    </Link>
-                    <Button 
-                        onClick={handleLogout}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white"
-                    >
-                        <LogOut className="w-4 h-4 mr-2" /> Logout
-                  </Button>
-                 </div>
-              )
+                <Button 
+                  onClick={handleLogout}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white"
+                >
+                  <LogOut className="w-4 h-4 mr-2" /> Disconnect
+                </Button>
+              </div>
             ) : (
-              <Button 
-                onClick={handleLogin}
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold py-3 px-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 border-0"
-              >
-                <LogIn className="w-4 h-4 mr-2" />
-                Sign In / Register
-              </Button>
+              <Link to={createPageUrl("WalletLogin")} className="w-full">
+                <Button 
+                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold py-3 px-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+                >
+                  <Wallet className="w-4 h-4 mr-2" />
+                  Connect Wallet
+                </Button>
+              </Link>
             )}
             <div className="text-center text-xs text-slate-500 pt-2 border-t border-slate-700/50">
                 © {new Date().getFullYear()} Isolex Corporation. All Rights Reserved.

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { base44 } from "@/api/base44Client";
+import { useWallet } from "@/lib/WalletContext";
 import { getSolanaStats } from "@/functions/getSolanaStats.js";
 import { 
   Car, 
@@ -24,7 +25,7 @@ import {
 import { motion } from "framer-motion";
 
 export default function HomePage() {
-  const [user, setUser] = React.useState(null);
+  const { isConnected } = useWallet();
   const [isLoading, setIsLoading] = React.useState(true);
   const [stats, setStats] = React.useState({
     vehicles: 0,
@@ -40,9 +41,6 @@ export default function HomePage() {
 
   const loadData = async () => {
     try {
-      const userData = await base44.auth.me().catch(() => null);
-      setUser(userData);
-
       const statsResponse = await getSolanaStats();
       
       if (statsResponse.data.success) {
@@ -59,10 +57,6 @@ export default function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleLogin = () => {
-    base44.auth.redirectToLogin(window.location.href);
   };
 
   const features = [
@@ -177,7 +171,7 @@ export default function HomePage() {
 
             {/* Replaced button section */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
-              {!isLoading && user ? (
+              {isConnected ? (
                 <Link to={createPageUrl("RegisterVIN")}>
                   <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white px-10 py-4 rounded-xl text-2xl font-semibold shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 group border-0">
                     <Lock className="w-6 h-6 mr-3" />
@@ -186,14 +180,15 @@ export default function HomePage() {
                   </Button>
                 </Link>
               ) : (
-                <Button 
-                  onClick={handleLogin}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white px-10 py-4 rounded-xl text-2xl font-semibold shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 group border-0"
-                >
-                  <LogIn className="w-6 h-6 mr-3" />
-                  Get Started Now
-                  <ArrowRight className="w-6 h-6 ml-3 group-hover:translate-x-1 transition-transform duration-300" />
-                </Button>
+                <Link to={createPageUrl("WalletLogin")}>
+                  <Button 
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white px-10 py-4 rounded-xl text-2xl font-semibold shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 group border-0"
+                  >
+                    <LogIn className="w-6 h-6 mr-3" />
+                    Connect Wallet
+                    <ArrowRight className="w-6 h-6 ml-3 group-hover:translate-x-1 transition-transform duration-300" />
+                  </Button>
+                </Link>
               )}
             </div>
           </motion.div>
@@ -338,7 +333,7 @@ export default function HomePage() {
               Join the revolution and give your vehicle a permanent, verifiable identity on the Solana blockchain.
             </p>
             
-            {!isLoading && user ? (
+            {isConnected ? (
               <Link to={createPageUrl("RegisterVIN")}>
                 <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white px-10 py-4 rounded-xl text-2xl font-semibold shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 group border-0">
                   <Lock className="w-6 h-6 mr-3" />
@@ -347,14 +342,15 @@ export default function HomePage() {
                 </Button>
               </Link>
             ) : (
-              <Button 
-                onClick={handleLogin}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white px-10 py-4 rounded-xl text-2xl font-semibold shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 group border-0"
-              >
-                <LogIn className="w-6 h-6 mr-3" />
-                Get Started Now
-                <ArrowRight className="w-6 h-6 ml-3 group-hover:translate-x-1 transition-transform duration-300" />
-              </Button>
+              <Link to={createPageUrl("WalletLogin")}>
+                <Button 
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white px-10 py-4 rounded-xl text-2xl font-semibold shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 group border-0"
+                >
+                  <LogIn className="w-6 h-6 mr-3" />
+                  Connect Wallet
+                  <ArrowRight className="w-6 h-6 ml-3 group-hover:translate-x-1 transition-transform duration-300" />
+                </Button>
+              </Link>
             )}
           </motion.div>
         </div>

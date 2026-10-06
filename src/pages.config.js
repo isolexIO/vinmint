@@ -15,6 +15,7 @@ import ServiceRecordPublicView from './pages/ServiceRecordPublicView';
 import InvoicePublicView from './pages/InvoicePublicView';
 import TermsOfUse from './pages/TermsOfUse';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import WalletLogin from './pages/WalletLogin';
 import __Layout from './Layout.jsx';
 
 
@@ -36,6 +37,7 @@ export const PAGES = {
     "InvoicePublicView": InvoicePublicView,
     "TermsOfUse": TermsOfUse,
     "PrivacyPolicy": PrivacyPolicy,
+    "WalletLogin": WalletLogin,
 }
 
 export const pagesConfig = {
