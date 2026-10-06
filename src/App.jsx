@@ -10,12 +10,14 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { WalletProvider } from '@/lib/WalletContext';
 import AdapterWalletProvider from '@/components/wallet/AdapterWalletProvider';
+import AccountAccess from '@/components/wallet/AccountAccess';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import { ThemeProvider } from "next-themes";
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
+const accountPages = new Set(['Wallet', 'RegisterVIN', 'ProfileSetup', 'CustomerDashboard', 'DealerDashboard', 'ShopDashboard', 'AdminPanel', 'UserProfile']);
 
 const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
@@ -47,7 +49,7 @@ const AuthenticatedApp = () => {
           path={`/${path}`}
           element={
             <LayoutWrapper currentPageName={path}>
-              <Page />
+              {accountPages.has(path) ? <AccountAccess><Page /></AccountAccess> : <Page />}
             </LayoutWrapper>
           }
         />

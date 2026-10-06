@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { useWallet } from '@/lib/WalletContext';
-import { isAdminWallet } from '@/lib/adminWallets';
+import useWalletLoginRedirect from '@/components/wallet/useWalletLoginRedirect';
 import MobileWalletHandoff from '@/components/wallet/MobileWalletHandoff';
 import AdapterWalletOptions from '@/components/wallet/AdapterWalletOptions';
 import { Button } from '@/components/ui/button';
@@ -33,12 +33,12 @@ const BackpackIcon = () => (
 );
 
 export default function WalletLogin() {
-  const navigate = useNavigate();
   const {
     isConnected, walletAddress, walletType, isConnecting, error, isMobile,
     connectPhantom, connectSolflare, connectBackpack, connectAdapterWallet, generateAutoWallet, disconnect,
   } = useWallet();
   const [localError, setLocalError] = useState(null);
+  const { continueLogin, isFinishing } = useWalletLoginRedirect(setLocalError);
 
   const handleConnect = async (method) => {
     setLocalError(null);
@@ -53,27 +53,7 @@ export default function WalletLogin() {
     }
   };
 
-  useEffect(() => {
-    if (!isConnected || !walletAddress) return;
-    const getDestination = () => {
-      if (isAdminWallet(walletAddress)) return createPageUrl('AdminPanel');
-      try {
-        const data = localStorage.getItem(`vinmint_profile_${walletAddress}`);
-        if (data) {
-          const profile = JSON.parse(data);
-          switch (profile.user_type) {
-            case 'admin': return createPageUrl('AdminPanel');
-            case 'dealer': return createPageUrl('DealerDashboard');
-            case 'shop_owner': return createPageUrl('ShopDashboard');
-            default: return createPageUrl('CustomerDashboard');
-          }
-        }
-      } catch {}
-      return createPageUrl('ProfileSetup');
-    };
-    const timer = setTimeout(() => navigate(getDestination()), 800);
-    return () => clearTimeout(timer);
-  }, [isConnected, walletAddress, navigate]);
+
 
   const displayError = localError || error;
 
@@ -110,15 +90,18 @@ export default function WalletLogin() {
                 {walletAddress}
               </p>
               <p className="text-slate-500 text-xs mb-4">Type: {walletType}</p>
+              {displayError && <p role="alert" className="text-destructive text-sm mb-4">{displayError}</p>}
               <div className="flex gap-2">
                 <Button
-                  onClick={() => navigate(createPageUrl('Home'))}
+                  onClick={continueLogin}
+                  disabled={isFinishing}
                   className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white border-0"
                 >
-                  Continue <ArrowRight className="w-4 h-4 ml-2" />
+                  {isFinishing ? <><Loader2 className="w-4 h-4 animate-spin" /> Finishing sign-in...</> : <>Continue <ArrowRight className="w-4 h-4 ml-2" /></>}
                 </Button>
                 <Button
                   onClick={disconnect}
+                  disabled={isFinishing}
                   variant="outline"
                   className="border-slate-600 text-slate-300"
                 >

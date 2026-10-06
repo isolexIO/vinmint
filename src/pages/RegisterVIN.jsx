@@ -71,7 +71,10 @@ export default function RegisterVIN() {
             }
         } catch(e) {
             console.error("User not logged in or failed to load user", e);
-            window.location.href = createPageUrl("Home");
+            setErrorMessage("Your account session could not be loaded. Please sign in again to continue.");
+            if (e.status === 401 || e.response?.status === 401) {
+              User.redirectToLogin(window.location.href);
+            }
         }
     };
     loadUserData();

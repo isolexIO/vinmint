@@ -13,6 +13,7 @@ export function WalletProvider({ children }) {
   const [walletType, setWalletType] = useState(null);
   const [autoKeypair, setAutoKeypair] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(true);
   const [error, setError] = useState(null);
 
   // Restore session and reconnect trusted external wallets
@@ -41,6 +42,8 @@ export function WalletProvider({ children }) {
       }
     } catch (e) {
       console.error('Failed to restore wallet session:', e);
+    } finally {
+      setIsRestoring(false);
     }
   }, []);
 
@@ -209,6 +212,7 @@ export function WalletProvider({ children }) {
     walletType,
     autoKeypair,
     isConnecting,
+    isRestoring,
     error,
     isConnected: !!walletAddress,
     isMobile,

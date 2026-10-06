@@ -30,6 +30,12 @@ export default function mobileWalletConnection(type) {
   const origin = window.self !== window.top ? 'https://vinmint.base44.app' : window.location.origin;
   // Start with a clean URL so login tokens are never passed to another app.
   const target = new URL('/WalletLogin', origin);
+  const currentParams = new URLSearchParams(window.location.search);
+  const next = currentParams.get('next');
+  if (next) target.searchParams.set('next', next);
+  if (next === '/ProfileSetup' && currentParams.get('invite_token')) {
+    target.searchParams.set('invite_token', currentParams.get('invite_token'));
+  }
   target.searchParams.set('connectWallet', type);
   return `${browseLinks[type]}${encodeURIComponent(target.href)}?ref=${encodeURIComponent(origin)}`;
 }

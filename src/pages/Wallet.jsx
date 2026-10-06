@@ -304,11 +304,11 @@ export default function WalletPage() {
                      <CardContent>
                          <p className="text-slate-300">You must be logged in to access your wallet. Please sign in to continue.</p>
                          <Button 
-                             onClick={() => window.location.href = "/Home"}
+                             onClick={() => base44.auth.redirectToLogin(window.location.href)}
                              className="mt-4 w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white"
                          >
-                             Go to Home Page
-                         </Button>
+                             Sign In to View Wallet
+                             </Button>
                      </CardContent>
                  </Card>
             </div>

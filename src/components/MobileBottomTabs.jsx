@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Home, Search, Wallet, LayoutDashboard } from "lucide-react";
+import { Home, Search, Wallet, LayoutDashboard, PlusCircle } from "lucide-react";
 
 export default function MobileBottomTabs({ dashboardUrl }) {
   const location = useLocation();
@@ -10,6 +10,7 @@ export default function MobileBottomTabs({ dashboardUrl }) {
     { title: "Home", url: createPageUrl("Home"), icon: Home },
     { title: "Explorer", url: createPageUrl("Explorer"), icon: Search },
     { title: "Dashboard", url: dashboardUrl || createPageUrl("CustomerDashboard"), icon: LayoutDashboard },
+    { title: "Register", url: createPageUrl("RegisterVIN"), icon: PlusCircle },
     { title: "Wallet", url: createPageUrl("Wallet"), icon: Wallet },
   ];
 

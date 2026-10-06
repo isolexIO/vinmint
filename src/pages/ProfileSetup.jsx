@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import { User } from "@/entities/User";
 import { setupUserProfile } from "@/functions/setupUserProfile.js";
 import { generateAndSaveWallet } from "@/functions/generateAndSaveWallet.js";
+import { getWalletBalance } from "@/functions/getWalletBalance.js";
+import { useWallet } from "@/lib/WalletContext";
+import { getLoginReturnPath } from "@/components/wallet/walletLoginNavigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +39,7 @@ const VinTokenLogo = () => (
 
 export default function ProfileSetup() {
   const navigate = useNavigate();
+  const { walletAddress } = useWallet();
   const [user, setUser] = useState(null); 
   const [userType, setUserType] = useState(null); 
   const [generatedWallet, setGeneratedWallet] = useState(null);
@@ -99,23 +103,24 @@ export default function ProfileSetup() {
     setErrorMessage("");
 
     try {
-      const response = await generateAndSaveWallet();
-      
-      if (response.data.success) {
-        setGeneratedWallet({
-          address: response.data.wallet_address,
-          balance: {
-            sol: response.data.balances?.sol || 0,
-            vin: response.data.balances?.vin || 1500 // Give initial VIN balance for demo
-          }
-        });
-        setStep(2);
-      } else {
-        throw new Error(response.data.error || "Failed to generate wallet");
+      const account = await User.me();
+      setUser(account);
+      let address = account.wallet_address || walletAddress;
+      if (!address) {
+        const response = await generateAndSaveWallet();
+        if (!response.data.success) throw new Error(response.data.error || "Failed to generate wallet");
+        address = response.data.wallet_address;
       }
+      const response = await getWalletBalance({ walletAddress: address });
+      if (!response.data.success) throw new Error(response.data.error || "Could not load your wallet balance");
+      setGeneratedWallet({
+        address,
+        balance: { sol: response.data.solBalance || 0, vin: response.data.vinTokenBalance || 0 }
+      });
+      setStep(2);
     } catch (error) {
       console.error("Error generating wallet:", error);
-      setErrorMessage("Failed to generate wallet. Please try again.");
+      setErrorMessage(error.response?.data?.error || error.message || "Could not load your wallet. Please try again.");
     } finally {
       setIsGeneratingWallet(false);
     }
@@ -163,6 +168,13 @@ export default function ProfileSetup() {
       const response = await setupUserProfile(profilePayload);
 
       if (response.data.success) {
+        const profile = {
+          user_type: userType,
+          profile_completed: true,
+          shop_id: response.data.shop_id,
+          business_domain: response.data.business_domain,
+        };
+        localStorage.setItem(`vinmint_profile_${walletAddress || generatedWallet.address}`, JSON.stringify(profile));
         // Update local wallet balance if payment was processed
         if (!isInvited && (userType === 'dealer' || userType === 'shop_owner')) {
           setGeneratedWallet(prev => ({
@@ -231,7 +243,7 @@ export default function ProfileSetup() {
             Complete Your Profile
           </h1>
           <p className="text-slate-300 text-lg">
-            {step === 1 ? "Choose your account type and we'll generate a secure wallet for you" : "Complete your profile setup"}
+            {step === 1 ? "Choose your account type to continue with your wallet" : "Complete your profile setup"}
           </p>
         </div>
 
@@ -250,7 +262,7 @@ export default function ProfileSetup() {
                     What best describes you?
                   </CardTitle>
                   <p className="text-center text-slate-400">
-                    We'll create a secure Solana wallet for you automatically
+                    We'll use your existing wallet, or create one if you don't have one
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -274,7 +286,7 @@ export default function ProfileSetup() {
                           <div className="mt-4">
                             <Button className="bg-blue-600 hover:bg-blue-500 text-white font-semibold w-full">
                               <Sparkles className="w-4 h-4 mr-2" />
-                              Generate Wallet & Continue
+                              Continue with Wallet
                             </Button>
                           </div>
                           <p className="text-green-400 text-sm font-bold mt-2">FREE + Auto Wallet</p>
@@ -301,7 +313,7 @@ export default function ProfileSetup() {
                           <div className="mt-4">
                             <Button className="bg-yellow-600 hover:bg-yellow-500 text-white font-semibold w-full">
                               <Sparkles className="w-4 h-4 mr-2" />
-                              Generate Wallet & Continue
+                              Continue with Wallet
                             </Button>
                           </div>
                           <div className="mt-2 text-center">
@@ -334,7 +346,7 @@ export default function ProfileSetup() {
                           <div className="mt-4">
                             <Button className="bg-purple-600 hover:bg-purple-500 text-white font-semibold w-full">
                               <Sparkles className="w-4 h-4 mr-2" />
-                              Generate Wallet & Continue
+                              Continue with Wallet
                             </Button>
                           </div>
                           <div className="mt-2 text-center">
@@ -395,7 +407,7 @@ export default function ProfileSetup() {
                           <Wallet className="w-5 h-5 text-white" />
                         </div>
                         <div>
-                          <h4 className="text-green-200 font-semibold">✅ Wallet Generated Successfully</h4>
+                          <h4 className="text-green-200 font-semibold">Wallet Ready</h4>
                           <p className="text-green-100 text-sm font-mono">{generatedWallet.address}</p>
                         </div>
                       </div>
@@ -649,7 +661,10 @@ export default function ProfileSetup() {
                   )}
                   <Button
                     onClick={() => {
-                      if (userType === 'shop_owner') {
+                      const next = getLoginReturnPath();
+                      if (next && next !== '/ProfileSetup') {
+                        navigate(next);
+                      } else if (userType === 'shop_owner') {
                         navigate(createPageUrl("ShopDashboard"));
                       } else if (userType === 'dealer') {
                         navigate(createPageUrl("DealerDashboard"));
