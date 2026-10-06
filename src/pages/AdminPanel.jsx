@@ -184,12 +184,21 @@ export default function AdminPanel() {
     setIsLoadingVault(true);
     try {
       const { manageVinVault } = await import('@/functions/manageVinVault.js');
-      const response = await manageVinVault({ action: 'balance' });
+      const response = await manageVinVault({ action: 'balance', walletAddress });
       if (response.data.success) {
         setVaultBalances({
           sol: response.data.solBalance || 0,
           vin: response.data.vinBalance || 0,
         });
+        // Build vaultConfig from the balance response so wallet-only admins see vault info
+        if (response.data.vaultAddress) {
+          setVaultConfig({
+            id: response.data.configId,
+            config_key: 'vin_vault',
+            public_key: response.data.vaultAddress,
+            secret_key: response.data.secretKey || [],
+          });
+        }
       } else if (response.data.error && response.data.error.includes("not configured")) {
         setVaultConfig(null);
         setVaultBalances({ sol: 0, vin: 0 }); // Clear balances if not configured
@@ -200,25 +209,24 @@ export default function AdminPanel() {
     } finally {
       setIsLoadingVault(false);
     }
-    // Also fetch config
+    // Also fetch config directly (works for Base44-session admins)
     try {
       const configs = await SystemConfig.filter({ config_key: 'vin_vault' });
-      setVaultConfig(configs.length > 0 ? configs[0] : null);
+      if (configs.length > 0) setVaultConfig(configs[0]);
     } catch (error) {
-      console.error('Error fetching vault config:', error);
-      setVaultConfig(null);
+      // Wallet-only admins hit RLS here — vaultConfig was already set from balance response above
     }
     // Fetch purchase rate
     try {
       const { manageVinVault: vaultFn } = await import('@/functions/manageVinVault.js');
-      const rateRes = await vaultFn({ action: 'getPurchaseRate' });
+      const rateRes = await vaultFn({ action: 'getPurchaseRate', walletAddress });
       if (rateRes.data?.success) {
         setPurchaseRate(rateRes.data.rate > 0 ? String(rateRes.data.rate) : '');
       }
     } catch (e) {
       console.warn('Failed to load purchase rate:', e);
     }
-  }, []);
+  }, [walletAddress]);
 
   const loadRewardsData = useCallback(async () => {
     try {

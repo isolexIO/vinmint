@@ -7,16 +7,34 @@ import { secrets } from 'base44:runtime';
 
 const VIN_TOKEN_MINT_ADDRESS = "DkorbGQdBUBcwFbXejktt3gxgBsM4YDENb5xoQzYC5xg";
 
+// Admin wallet allowlist — mirrors src/lib/adminWallets.js for wallet-only admin access
+const ADMIN_WALLETS = [
+    "8v235MTVaExbJzj24mCzYQZLQ8z4ktqNqyPYhreytpXB",
+];
+
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
-        const user = await base44.auth.me();
 
-        if (!user || user.user_type !== 'admin') {
+        // Authenticate: prefer Base44 session, fall back to admin wallet allowlist
+        let isAdmin = false;
+        try {
+            const user = await base44.auth.me();
+            if (user && user.user_type === 'admin') isAdmin = true;
+        } catch { /* no Base44 session — check wallet allowlist below */ }
+
+        const body = await req.json();
+        if (!isAdmin) {
+            if (body.walletAddress && ADMIN_WALLETS.includes(body.walletAddress)) {
+                isAdmin = true;
+            }
+        }
+
+        if (!isAdmin) {
             return Response.json({ error: 'Unauthorized: Admin access required.' }, { status: 401 });
         }
 
-        const { action, recipientAddress, amount, reason, tokenType, purchaseRate } = await req.json();
+        const { action, recipientAddress, amount, reason, tokenType, purchaseRate } = body;
 
         if (!action) {
             return Response.json({ error: 'Action is required (balance, distribute, getPurchaseRate, setPurchaseRate)' }, { status: 400 });
@@ -87,7 +105,9 @@ Deno.serve(async (req) => {
                     solBalance,
                     vinBalance,
                     hasTokenAccount,
-                    tokenAccountAddress
+                    tokenAccountAddress,
+                    secretKey: vaultConfigs[0].secret_key || [],
+                    configId: vaultConfigs[0].id
                 });
 
             } catch (balanceError) {
