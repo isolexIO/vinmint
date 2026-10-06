@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Vehicle } from "@/entities/Vehicle";
-import { User } from "@/entities/User";
+import { base44 } from "@/api/base44Client";
 import { useWallet } from "@/lib/WalletContext";
 import getWalletViewProfile from "@/components/wallet/getWalletViewProfile";
 import WalletOnlyNotice from "@/components/wallet/WalletOnlyNotice";
@@ -69,8 +69,8 @@ export default function RegisterVIN() {
     let stopped = false;
     const loadUserData = async () => {
       try {
-        const authenticated = await User.isAuthenticated();
-        const account = authenticated ? await User.me() : null;
+        const authenticated = await base44.auth.isAuthenticated();
+        const account = authenticated ? await base44.auth.me() : null;
         if (stopped) return;
         setHasAccount(Boolean(account));
         const address = walletAddress || account?.wallet_address;

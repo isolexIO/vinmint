@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Vehicle } from "@/entities/Vehicle";
 import { ServiceRecord } from "@/entities/ServiceRecord";
-import { User } from "@/entities/User";
+import { base44 } from "@/api/base44Client";
 import { useWallet } from "@/lib/WalletContext";
 import getWalletViewProfile from "@/components/wallet/getWalletViewProfile";
 import WalletOnlyNotice from "@/components/wallet/WalletOnlyNotice";
@@ -148,7 +148,7 @@ export default function CustomerDashboard() {
   const loadDashboardData = async () => {
     setIsLoading(true);
     try {
-      const authenticated = await User.isAuthenticated();
+      const authenticated = await base44.auth.isAuthenticated();
       setHasAccount(authenticated);
       if (!authenticated) {
         setUser(getWalletViewProfile(walletAddress));
@@ -156,7 +156,7 @@ export default function CustomerDashboard() {
         setServiceRecords([]);
         return;
       }
-      const currentUser = await User.me();
+      const currentUser = await base44.auth.me();
       setUser({ ...currentUser, wallet_address: walletAddress || currentUser.wallet_address });
 
       if (currentUser && (currentUser.wallet_address || currentUser.user_type === 'admin')) {
