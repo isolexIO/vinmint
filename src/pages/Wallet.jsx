@@ -71,6 +71,8 @@ export default function WalletPage() {
     const [vinNfts, setVinNfts] = useState([]);
     const [serviceNfts, setServiceNfts] = useState([]);
     const [balances, setBalances] = useState({ sol: 0, vin: 0 });
+    const [connectedBalances, setConnectedBalances] = useState({ sol: 0, vin: 0 });
+    const [isConnectedBalanceLoading, setIsConnectedBalanceLoading] = useState(false);
     const [prices, setPrices] = useState({ sol: 0, vin: 0.10 });
     const [isBalanceLoading, setIsBalanceLoading] = useState(false);
     const [isPricesLoading, setIsPricesLoading] = useState(false);
@@ -142,6 +144,27 @@ export default function WalletPage() {
         }
     }, []);
 
+    const fetchConnectedBalances = useCallback(async (address) => {
+        if (!address) return;
+        setIsConnectedBalanceLoading(true);
+        try {
+            const response = await getWalletBalance({ walletAddress: address });
+            if (response.data && response.data.success) {
+                setConnectedBalances({
+                    sol: response.data.solBalance || 0,
+                    vin: response.data.vinTokenBalance || 0
+                });
+            } else {
+                setConnectedBalances({ sol: 0, vin: 0 });
+            }
+        } catch (error) {
+            console.error("Error fetching connected wallet balances:", error);
+            setConnectedBalances({ sol: 0, vin: 0 });
+        } finally {
+            setIsConnectedBalanceLoading(false);
+        }
+    }, []);
+
     const fetchTransactions = useCallback(async (walletAddress) => {
         if (!walletAddress) return;
         
@@ -210,6 +233,12 @@ export default function WalletPage() {
 
             // Then load balances
             await fetchBalances(userData.wallet_address, Boolean(account && account.wallet_address === userData.wallet_address));
+            // Also load the connected external wallet's balance when it differs from the account wallet
+            if (account && walletAddress && account.wallet_address && walletAddress !== account.wallet_address) {
+                fetchConnectedBalances(walletAddress);
+            } else {
+                setConnectedBalances({ sol: 0, vin: 0 });
+            }
             if (!account) {
                 await fetchTransactions(userData.wallet_address);
                 return;
@@ -249,7 +278,7 @@ export default function WalletPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [fetchBalances, fetchPrices, fetchTransactions, walletAddress]);
+    }, [fetchBalances, fetchConnectedBalances, fetchPrices, fetchTransactions, walletAddress]);
 
     useEffect(() => {
         loadWalletData();
@@ -372,6 +401,9 @@ export default function WalletPage() {
     const totalUsdValue = (balances.sol * prices.sol) + (balances.vin * prices.vin);
     const canUseAccountWallet = hasAccount && accountWallet === user.wallet_address;
     const canRevealKey = canUseAccountWallet || autoKeypair?.publicKey.toString() === user.wallet_address;
+    // Show the connected external wallet's balances alongside the account wallet when they differ
+    const showConnectedWallet = hasAccount && accountWallet && walletAddress && walletAddress !== accountWallet;
+    const connectedUsdValue = (connectedBalances.sol * prices.sol) + (connectedBalances.vin * prices.vin);
 
     return (
         <>
@@ -577,6 +609,48 @@ export default function WalletPage() {
                                 </Card>
                             </motion.div>
                         </div>
+
+                        {showConnectedWallet && (
+                            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="mb-6 sm:mb-8">
+                                <Card className="bg-slate-800/50 border-blue-500/30 backdrop-blur-xl">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-white text-sm sm:text-base flex items-center gap-2">
+                                            <WalletIcon className="w-5 h-5 text-blue-400" />
+                                            Connected External Wallet
+                                        </CardTitle>
+                                        <p className="text-slate-400 text-xs font-mono break-all">{walletAddress}</p>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {isConnectedBalanceLoading ? (
+                                            <div className="flex items-center gap-2">
+                                                <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                                                <span className="text-slate-300 text-sm">Loading balances...</span>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="p-3 bg-slate-900/50 rounded-lg">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <SolanaLogo />
+                                                        <span className="text-slate-400 text-xs">SOL</span>
+                                                    </div>
+                                                    <p className="text-xl font-bold text-white">{connectedBalances.sol.toFixed(6)}</p>
+                                                    <p className="text-slate-400 text-xs">${(connectedBalances.sol * prices.sol).toFixed(2)} USD</p>
+                                                </div>
+                                                <div className="p-3 bg-slate-900/50 rounded-lg">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <VinTokenLogo />
+                                                        <span className="text-slate-400 text-xs">$VIN</span>
+                                                    </div>
+                                                    <p className="text-xl font-bold text-white">{connectedBalances.vin.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 6 })}</p>
+                                                    <p className="text-slate-400 text-xs">${(connectedBalances.vin * prices.vin).toFixed(2)} USD</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <p className="text-slate-500 text-xs mt-3">Total: ${connectedUsdValue.toFixed(2)} USD · View the VIN Vault balance on the Admin Panel.</p>
+                                    </CardContent>
+                                </Card>
+                            </motion.div>
+                        )}
 
                         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
                             <Card className="bg-slate-800/50 border-purple-500/20 backdrop-blur-xl mb-8">
