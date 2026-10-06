@@ -289,10 +289,10 @@ export default function WalletPage() {
 
     // When viewing the connected wallet, load its on-chain transaction history on demand.
     useEffect(() => {
-        if (activeWallet === 'connected' && connectedWallet) {
-            fetchTransactions(connectedWallet);
+        if (activeWallet === 'connected' && walletAddress) {
+            fetchTransactions(walletAddress);
         }
-    }, [activeWallet, connectedWallet, fetchTransactions]);
+    }, [activeWallet, walletAddress, fetchTransactions]);
 
     const handleCreateWallet = async () => {
         setIsGenerating(true);
