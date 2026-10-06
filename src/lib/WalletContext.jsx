@@ -58,6 +58,12 @@ export function WalletProvider({ children }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   };
 
+  const withTimeout = (promise, ms, msg) =>
+    Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error(msg)), ms)),
+    ]);
+
   const connectExternalWallet = useCallback(async (type) => {
     setIsConnecting(true);
     setError(null);
@@ -69,11 +75,13 @@ export function WalletProvider({ children }) {
           return;
         }
         const labels = { phantom: 'Phantom', solflare: 'Solflare', backpack: 'Backpack' };
-        const sites = { phantom: 'https://phantom.com/', solflare: 'https://solflare.com/', backpack: 'https://backpack.app/' };
-        window.open(sites[type], '_blank', 'noopener,noreferrer');
-        throw new Error(`${labels[type]} not found. Install its browser extension, then try again.`);
+        throw new Error(`${labels[type]} was not detected in this browser. Open VINmint inside the ${labels[type]} app on mobile, or install the ${labels[type]} extension on desktop, then try again.`);
       }
-      const result = await provider.connect();
+      const result = await withTimeout(
+        provider.connect(),
+        30000,
+        'The wallet did not respond in time. Please approve the connection prompt in your wallet, or try again.'
+      );
       const publicKey = result?.publicKey || provider.publicKey;
       if (!publicKey) throw new Error('The wallet did not approve the connection. Please try again.');
       const address = publicKey.toString();
@@ -105,7 +113,11 @@ export function WalletProvider({ children }) {
           ? 'Install the Jupiter Wallet browser extension, then reload this page to connect. Jupiter Mobile QR connections require a separate WalletConnect setup.'
           : 'Open VINmint in Chrome on Android with an MWA-compatible wallet installed, then try again.');
       }
-      await adapter.connect();
+      await withTimeout(
+        adapter.connect(),
+        30000,
+        'The wallet did not respond in time. Approve the connection prompt in your wallet, or try again.'
+      );
       if (!adapter.publicKey) throw new Error('The wallet did not approve the connection. Please try again.');
       const address = adapter.publicKey.toString();
       saveSession(address, type);
@@ -144,20 +156,10 @@ export function WalletProvider({ children }) {
     setIsConnecting(true);
     setError(null);
     try {
-      let keypair;
-      let attempts = 0;
-      const maxAttempts = 2000000;
-      while (attempts < maxAttempts) {
-        keypair = Keypair.generate();
-        attempts++;
-        if (keypair.publicKey.toString().startsWith('VIN')) break;
-        if (attempts % 5000 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 0));
-        }
-      }
-      if (!keypair || !keypair.publicKey.toString().startsWith('VIN')) {
-        throw new Error('Could not generate a VIN-prefixed wallet. Please try again.');
-      }
+      // Generate a standard Solana keypair instantly. (A "VIN" vanity prefix is
+      // impossible in base58 — the character "I" is excluded from the alphabet —
+      // so any vanity loop would hang forever. We generate a normal address.)
+      const keypair = Keypair.generate();
       const address = keypair.publicKey.toString();
       setAutoKeypair(keypair);
       // Persist the generated keypair independently so it survives reloads.

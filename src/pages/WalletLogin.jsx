@@ -53,6 +53,11 @@ export default function WalletLogin() {
     }
   };
 
+  const handleCancel = () => {
+    setLocalError(null);
+    window.location.reload();
+  };
+
 
 
   const displayError = localError || error;
@@ -115,11 +120,52 @@ export default function WalletLogin() {
             {displayError && (
               <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-                <p className="text-red-300 text-sm">{displayError}</p>
+                <div className="flex-1">
+                  <p className="text-red-300 text-sm">{displayError}</p>
+                  <p className="text-slate-400 text-xs mt-1">
+                    No wallet installed? You can still use VINmint — tap “Generate New Wallet” below to create one instantly on this device.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {isConnecting && (
+              <div className="mb-4 flex items-center justify-between p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
+                <span className="text-purple-200 text-sm flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Waiting for wallet approval…
+                </span>
+                <button onClick={handleCancel} className="text-purple-300 hover:text-white text-xs font-medium underline">
+                  Cancel
+                </button>
               </div>
             )}
 
             <div className="space-y-3">
+              {/* Instant fallback — generate a wallet on this device */}
+              <button
+                onClick={() => handleConnect('auto')}
+                disabled={isConnecting}
+                className="w-full p-4 rounded-xl bg-gradient-to-r from-purple-600/30 to-blue-600/30 border border-purple-400/50 hover:border-purple-300/70 backdrop-blur-xl flex items-center gap-4 transition-all duration-200 disabled:opacity-50"
+              >
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
+                  <Plus className="w-5 h-5 text-white" />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="text-white font-semibold flex items-center gap-2">
+                    Generate New Wallet
+                    <span className="text-[10px] uppercase tracking-wide bg-purple-500/30 text-purple-200 px-1.5 py-0.5 rounded">Instant</span>
+                  </p>
+                  <p className="text-slate-400 text-xs">No extension or sign-in needed — create a non-custodial wallet on this device</p>
+                </div>
+                {isConnecting ? <Loader2 className="w-5 h-5 animate-spin text-purple-400" /> : <ArrowRight className="w-5 h-5 text-slate-500" />}
+              </button>
+
+              <div className="flex items-center gap-3 py-1">
+                <div className="flex-1 h-px bg-slate-700" />
+                <span className="text-slate-500 text-xs">Or connect an existing wallet</span>
+                <div className="flex-1 h-px bg-slate-700" />
+              </div>
+
               {/* Phantom */}
               <button
                 onClick={() => handleConnect('phantom')}
@@ -167,29 +213,6 @@ export default function WalletLogin() {
               </button>
 
               <AdapterWalletOptions onConnect={handleConnect} isConnecting={isConnecting} />
-
-              {/* Divider */}
-              <div className="flex items-center gap-3 py-2">
-                <div className="flex-1 h-px bg-slate-700" />
-                <span className="text-slate-500 text-xs">OR</span>
-                <div className="flex-1 h-px bg-slate-700" />
-              </div>
-
-              {/* Auto-generated */}
-              <button
-                onClick={() => handleConnect('auto')}
-                disabled={isConnecting}
-                className="w-full p-4 rounded-xl bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/40 hover:border-purple-400/60 backdrop-blur-xl flex items-center gap-4 transition-all duration-200 disabled:opacity-50"
-              >
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
-                  <Plus className="w-5 h-5 text-white" />
-                </div>
-                <div className="text-left flex-1">
-                  <p className="text-white font-semibold">Generate New Wallet</p>
-                  <p className="text-slate-400 text-xs">Create a non-custodial wallet instantly</p>
-                </div>
-                {isConnecting ? <Loader2 className="w-5 h-5 animate-spin text-purple-400" /> : <ArrowRight className="w-5 h-5 text-slate-500" />}
-              </button>
             </div>
 
             {isMobile && (

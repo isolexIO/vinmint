@@ -2,12 +2,53 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68c843bc89d0e71e79dfc721/3ecf32e8e_493130015_122093779586861598_4848437929607844438_n.jpg" />
+    <link rel="apple-touch-icon" href="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68c843bc89d0e71e79dfc721/3ecf32e8e_493130015_122093779586861598_4848437929607844438_n.jpg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f0f1e" />
+    <meta name="description" content="VINmint transforms vehicle identification into .VINmint Web3 domains and verifiable service record NFTs on Solana." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="VINmint" />
+    <meta property="og:title" content="VINmint — Vehicle Identity on Solana" />
+    <meta property="og:description" content="Transform vehicle identification into .VINmint Web3 domains and verifiable service record NFTs on Solana." />
+    <meta property="og:image" content="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68c843bc89d0e71e79dfc721/3ecf32e8e_493130015_122093779586861598_4848437929607844438_n.jpg" />
     <link rel="manifest" href="/manifest.json" />
-    <title>Base44 APP</title>
+    <title>VINmint — Vehicle Identity on Solana</title>
+    <style>
+      #vinmint-splash {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: linear-gradient(135deg, #0f0f1e 0%, #1e1b4b 50%, #0f0f1e 100%);
+        transition: opacity 0.4s ease;
+      }
+      #vinmint-splash.fade { opacity: 0; pointer-events: none; }
+      #vinmint-splash img {
+        width: 72px; height: 72px; border-radius: 18px;
+        animation: vinmint-pulse 1.8s ease-in-out infinite;
+      }
+      #vinmint-splash h1 {
+        margin-top: 20px; font-family: system-ui, -apple-system, sans-serif;
+        font-size: 24px; font-weight: 800; letter-spacing: -0.02em;
+        background: linear-gradient(to right, #ffffff, #c4b5fd);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+      }
+      #vinmint-splash p {
+        margin-top: 6px; font-family: system-ui, -apple-system, sans-serif;
+        font-size: 13px; color: #94a3b8;
+      }
+      @keyframes vinmint-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(0.92); opacity: 0.7; }
+      }
+    </style>
   </head>
   <body>
+    <div id="vinmint-splash">
+      <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68c843bc89d0e71e79dfc721/3ecf32e8e_493130015_122093779586861598_4848437929607844438_n.jpg" alt="VINmint" />
+      <h1>VINmint</h1>
+      <p>Vehicle Identity on Solana</p>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

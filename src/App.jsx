@@ -13,6 +13,7 @@ import AdapterWalletProvider from '@/components/wallet/AdapterWalletProvider';
 import WalletAccess from '@/components/wallet/WalletAccess';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import { ThemeProvider } from "next-themes";
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -64,6 +65,7 @@ function App() {
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <ErrorBoundary>
       <AdapterWalletProvider>
       <WalletProvider>
       <AuthProvider>
@@ -78,6 +80,7 @@ function App() {
       </AuthProvider>
       </WalletProvider>
       </AdapterWalletProvider>
+      </ErrorBoundary>
     </ThemeProvider>
   )
 }
