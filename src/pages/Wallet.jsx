@@ -64,7 +64,7 @@ const VinTokenLogo = () => (
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export default function WalletPage() {
-    const { walletAddress, walletType, autoKeypair, disconnect, generateAutoWallet } = useWallet();
+    const { walletAddress, walletType, autoKeypair, disconnect, generateAutoWallet, clearAutoWallet } = useWallet();
     const [hasAccount, setHasAccount] = useState(false);
     const [accountWallet, setAccountWallet] = useState(null);
     const [user, setUser] = useState(null);
@@ -408,6 +408,12 @@ export default function WalletPage() {
                                             <Button onClick={() => disconnect()} variant="outline" className="flex-1 border-red-500/40 text-red-300 hover:bg-red-500/10 hover:text-red-200">
                                                 <LogOut className="w-4 h-4 mr-2" />
                                                 Disconnect
+                                            </Button>
+                                        )}
+                                        {activeWallet === 'vinmint' && generatedAddress && (
+                                            <Button onClick={() => { if (confirm('Log out of your VINmint wallet? This removes the generated keypair from this device. Make sure you have backed up your private key.')) { clearAutoWallet(); window.location.reload(); } }} variant="outline" className="flex-1 border-red-500/40 text-red-300 hover:bg-red-500/10 hover:text-red-200">
+                                                <LogOut className="w-4 h-4 mr-2" />
+                                                Log Out VINmint
                                             </Button>
                                         )}
                                     </div>

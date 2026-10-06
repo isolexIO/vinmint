@@ -176,6 +176,22 @@ export function WalletProvider({ children }) {
     }
   }, [walletAddress]);
 
+  const clearAutoWallet = useCallback(async () => {
+    setAutoKeypair(null);
+    localStorage.removeItem(GENERATED_STORAGE_KEY);
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const session = JSON.parse(saved);
+        if (session.type === 'auto') localStorage.removeItem(STORAGE_KEY);
+      } catch {}
+    }
+    if (walletType === 'auto') {
+      setWalletAddress(null);
+      setWalletType(null);
+    }
+  }, [walletType]);
+
   const disconnect = useCallback(async () => {
     const provider = getAdapterWallet(adapterWallets, walletType) || getInjectedProvider(walletType);
     setWalletAddress(null);
@@ -244,6 +260,7 @@ export function WalletProvider({ children }) {
     connectBackpack,
     connectAdapterWallet,
     generateAutoWallet,
+    clearAutoWallet,
     disconnect,
     signMessage,
     signTransaction,
