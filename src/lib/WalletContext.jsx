@@ -81,11 +81,24 @@ export function WalletProvider({ children }) {
   const connectSolflare = useCallback(() => connectExternalWallet('solflare'), [connectExternalWallet]);
   const connectBackpack = useCallback(() => connectExternalWallet('backpack'), [connectExternalWallet]);
 
-  const generateAutoWallet = useCallback(() => {
+  const generateAutoWallet = useCallback(async () => {
     setIsConnecting(true);
     setError(null);
     try {
-      const keypair = Keypair.generate();
+      let keypair;
+      let attempts = 0;
+      const maxAttempts = 2000000;
+      while (attempts < maxAttempts) {
+        keypair = Keypair.generate();
+        attempts++;
+        if (keypair.publicKey.toString().startsWith('VIN')) break;
+        if (attempts % 5000 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
+      if (!keypair || !keypair.publicKey.toString().startsWith('VIN')) {
+        throw new Error('Could not generate a VIN-prefixed wallet. Please try again.');
+      }
       const address = keypair.publicKey.toString();
       setAutoKeypair(keypair);
       setWalletAddress(address);

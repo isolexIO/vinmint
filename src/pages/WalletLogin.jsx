@@ -44,7 +44,7 @@ export default function WalletLogin() {
       if (method === 'phantom') await connectPhantom();
       else if (method === 'solflare') await connectSolflare();
       else if (method === 'backpack') await connectBackpack();
-      else if (method === 'auto') generateAutoWallet();
+      else if (method === 'auto') await generateAutoWallet();
     } catch (e) {
       setLocalError(e.message);
     }
