@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { useWallet } from '@/lib/WalletContext';
+import MobileWalletHandoff from '@/components/wallet/MobileWalletHandoff';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Wallet, Plus, ArrowRight, AlertCircle, Globe } from 'lucide-react';
@@ -60,6 +61,7 @@ export default function WalletLogin() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center px-4 py-12">
+      <MobileWalletHandoff onError={setLocalError} />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -158,7 +160,7 @@ export default function WalletLogin() {
                 <BackpackIcon />
                 <div className="text-left flex-1">
                   <p className="text-white font-semibold">Backpack</p>
-                  <p className="text-slate-400 text-xs">Browser extension</p>
+                  <p className="text-slate-400 text-xs">{isMobile ? 'Opens in Backpack browser' : 'Browser extension'}</p>
                 </div>
                 {isConnecting ? <Loader2 className="w-5 h-5 animate-spin text-purple-400" /> : <ArrowRight className="w-5 h-5 text-slate-500" />}
               </button>
@@ -191,7 +193,7 @@ export default function WalletLogin() {
               <div className="mt-6 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-start gap-2">
                 <Globe className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
                 <p className="text-blue-300 text-xs">
-                  On mobile, connecting opens your wallet app's built-in browser where the dApp can interact with your wallet directly.
+                  Choose your installed wallet and approve the connection in its browser. Continue using VINmint there; the connection does not carry back to Safari or Chrome.
                 </p>
               </div>
             )}

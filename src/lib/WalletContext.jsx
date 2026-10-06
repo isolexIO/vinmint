@@ -1,19 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Keypair } from '@solana/web3.js';
+import mobileWalletConnection, { getInjectedProvider, isMobile } from '@/components/wallet/mobileWalletConnection';
 
 const WalletContext = createContext(null);
 const STORAGE_KEY = 'vinmint_wallet_session';
-
-const isMobile = typeof navigator !== 'undefined' &&
-  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-function getInjectedProvider(type) {
-  if (typeof window === 'undefined') return null;
-  if (type === 'phantom') return window.solana?.isPhantom ? window.solana : null;
-  if (type === 'solflare') return window.solflare?.isSolflare ? window.solflare : null;
-  if (type === 'backpack') return window.backpack ? window.backpack : null;
-  return null;
-}
 
 export function WalletProvider({ children }) {
   const [walletAddress, setWalletAddress] = useState(null);
@@ -57,24 +47,28 @@ export function WalletProvider({ children }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   };
 
-  const connectPhantom = useCallback(async () => {
+  const connectExternalWallet = useCallback(async (type) => {
     setIsConnecting(true);
     setError(null);
     try {
-      let provider = getInjectedProvider('phantom');
+      const provider = getInjectedProvider(type);
       if (!provider) {
         if (isMobile) {
-          window.location.href = `https://phantom.app/ul/v1/browse?url=${encodeURIComponent(window.location.href)}`;
+          window.location.assign(mobileWalletConnection(type));
           return;
         }
-        window.open('https://phantom.app/', '_blank');
-        throw new Error('Phantom not found. Install the Phantom extension.');
+        const labels = { phantom: 'Phantom', solflare: 'Solflare', backpack: 'Backpack' };
+        const sites = { phantom: 'https://phantom.com/', solflare: 'https://solflare.com/', backpack: 'https://backpack.app/' };
+        window.open(sites[type], '_blank', 'noopener,noreferrer');
+        throw new Error(`${labels[type]} not found. Install its browser extension, then try again.`);
       }
-      const res = await provider.connect();
-      const address = res.publicKey.toString();
+      const result = await provider.connect();
+      const publicKey = result?.publicKey || provider.publicKey;
+      if (!publicKey) throw new Error('The wallet did not approve the connection. Please try again.');
+      const address = publicKey.toString();
+      saveSession(address, type);
       setWalletAddress(address);
-      setWalletType('phantom');
-      saveSession(address, 'phantom');
+      setWalletType(type);
     } catch (e) {
       setError(e.message);
       throw e;
@@ -83,53 +77,9 @@ export function WalletProvider({ children }) {
     }
   }, []);
 
-  const connectSolflare = useCallback(async () => {
-    setIsConnecting(true);
-    setError(null);
-    try {
-      let provider = getInjectedProvider('solflare');
-      if (!provider) {
-        if (isMobile) {
-          window.location.href = `https://solflare.com/ul/v1/browse?url=${encodeURIComponent(window.location.href)}`;
-          return;
-        }
-        window.open('https://solflare.com/', '_blank');
-        throw new Error('Solflare not found. Install Solflare.');
-      }
-      await provider.connect();
-      const address = provider.publicKey.toString();
-      setWalletAddress(address);
-      setWalletType('solflare');
-      saveSession(address, 'solflare');
-    } catch (e) {
-      setError(e.message);
-      throw e;
-    } finally {
-      setIsConnecting(false);
-    }
-  }, []);
-
-  const connectBackpack = useCallback(async () => {
-    setIsConnecting(true);
-    setError(null);
-    try {
-      let provider = getInjectedProvider('backpack');
-      if (!provider) {
-        window.open('https://backpack.app/', '_blank');
-        throw new Error('Backpack not found. Install Backpack.');
-      }
-      await provider.connect();
-      const address = provider.publicKey.toString();
-      setWalletAddress(address);
-      setWalletType('backpack');
-      saveSession(address, 'backpack');
-    } catch (e) {
-      setError(e.message);
-      throw e;
-    } finally {
-      setIsConnecting(false);
-    }
-  }, []);
+  const connectPhantom = useCallback(() => connectExternalWallet('phantom'), [connectExternalWallet]);
+  const connectSolflare = useCallback(() => connectExternalWallet('solflare'), [connectExternalWallet]);
+  const connectBackpack = useCallback(() => connectExternalWallet('backpack'), [connectExternalWallet]);
 
   const generateAutoWallet = useCallback(() => {
     setIsConnecting(true);
