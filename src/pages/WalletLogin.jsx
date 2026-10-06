@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { useWallet } from '@/lib/WalletContext';
+import { isAdminWallet } from '@/lib/adminWallets';
 import MobileWalletHandoff from '@/components/wallet/MobileWalletHandoff';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -51,11 +52,26 @@ export default function WalletLogin() {
   };
 
   useEffect(() => {
-    if (isConnected) {
-      const timer = setTimeout(() => navigate(createPageUrl('Home')), 800);
-      return () => clearTimeout(timer);
-    }
-  }, [isConnected, navigate]);
+    if (!isConnected || !walletAddress) return;
+    const getDestination = () => {
+      if (isAdminWallet(walletAddress)) return createPageUrl('AdminPanel');
+      try {
+        const data = localStorage.getItem(`vinmint_profile_${walletAddress}`);
+        if (data) {
+          const profile = JSON.parse(data);
+          switch (profile.user_type) {
+            case 'admin': return createPageUrl('AdminPanel');
+            case 'dealer': return createPageUrl('DealerDashboard');
+            case 'shop_owner': return createPageUrl('ShopDashboard');
+            default: return createPageUrl('CustomerDashboard');
+          }
+        }
+      } catch {}
+      return createPageUrl('ProfileSetup');
+    };
+    const timer = setTimeout(() => navigate(getDestination()), 800);
+    return () => clearTimeout(timer);
+  }, [isConnected, walletAddress, navigate]);
 
   const displayError = localError || error;
 
