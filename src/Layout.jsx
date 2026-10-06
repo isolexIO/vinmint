@@ -58,6 +58,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import NotificationSystem from './components/NotificationSystem'; // Import NotificationSystem
 import MobileBottomTabs from '@/components/MobileBottomTabs';
+import { isAdminWallet } from '@/lib/adminWallets';
 
 // Token logos components
 const SolanaLogoSmall = () => (
@@ -85,6 +86,10 @@ export default function Layout({ children, currentPageName }) {
 
   const getWalletProfile = () => {
     if (!walletAddress) return null;
+    // Admin allowlist takes precedence
+    if (isAdminWallet(walletAddress)) {
+      return { user_type: 'admin', wallet_address: walletAddress };
+    }
     try {
       const data = localStorage.getItem(`vinmint_profile_${walletAddress}`);
       return data ? JSON.parse(data) : null;
