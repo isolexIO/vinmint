@@ -184,8 +184,17 @@ export default function WalletPage() {
             const account = authenticated ? await base44.auth.me() : null;
             setHasAccount(Boolean(account));
             setAccountWallet(account?.wallet_address || null);
-            const address = walletAddress || account?.wallet_address;
-            const userData = account ? { ...account, wallet_address: address } : getWalletViewProfile(address);
+            // The VINmint-generated wallet (saved on the account) is "My Wallet".
+            // A connected external wallet is for signing only and does not override it.
+            let address;
+            let userData;
+            if (account) {
+              address = account.wallet_address;
+              userData = { ...account, wallet_address: address };
+            } else {
+              address = walletAddress;
+              userData = getWalletViewProfile(address);
+            }
             setUser(userData);
             setVinNfts([]);
             setServiceNfts([]);
