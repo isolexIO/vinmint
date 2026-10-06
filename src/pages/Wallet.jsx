@@ -690,9 +690,9 @@ export default function WalletPage() {
                                         <ShoppingCart className="w-6 h-6" />
                                         Buy VIN
                                     </Button>
-                                    <Button onClick={() => setShowTransferBetweenModal(true)} disabled={!hasTwoWallets} title={!hasTwoWallets ? 'Connect an external wallet different from your VINmint wallet to transfer between them.' : undefined} className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white h-20 flex-col text-sm gap-1 hover:from-blue-500 hover:to-cyan-500">
+                                    <Button onClick={() => setShowTransferBetweenModal(true)} disabled={!hasTwoWallets} title={!hasTwoWallets ? 'Connect an external wallet different from your VINmint wallet to transfer between them.' : undefined} className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white h-20 flex-col gap-1 hover:from-blue-500 hover:to-cyan-500 disabled:opacity-60">
                                         <Repeat className="w-6 h-6" />
-                                        Transfer Between Wallets
+                                        <span className="text-xs leading-tight text-center">Transfer<br/>Between Wallets</span>
                                     </Button>
                                     <Button onClick={openReceiveModal} className="bg-gradient-to-r from-green-600 to-emerald-600 text-white h-20 flex-col text-sm gap-1">
                                         <QrCode className="w-6 h-6" />
