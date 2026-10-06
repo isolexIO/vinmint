@@ -4,6 +4,7 @@ import { createPageUrl } from '@/utils';
 import { useWallet } from '@/lib/WalletContext';
 import { isAdminWallet } from '@/lib/adminWallets';
 import MobileWalletHandoff from '@/components/wallet/MobileWalletHandoff';
+import AdapterWalletOptions from '@/components/wallet/AdapterWalletOptions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Wallet, Plus, ArrowRight, AlertCircle, Globe } from 'lucide-react';
@@ -35,7 +36,7 @@ export default function WalletLogin() {
   const navigate = useNavigate();
   const {
     isConnected, walletAddress, walletType, isConnecting, error, isMobile,
-    connectPhantom, connectSolflare, connectBackpack, generateAutoWallet, disconnect,
+    connectPhantom, connectSolflare, connectBackpack, connectAdapterWallet, generateAutoWallet, disconnect,
   } = useWallet();
   const [localError, setLocalError] = useState(null);
 
@@ -45,6 +46,7 @@ export default function WalletLogin() {
       if (method === 'phantom') await connectPhantom();
       else if (method === 'solflare') await connectSolflare();
       else if (method === 'backpack') await connectBackpack();
+      else if (method === 'mwa' || method === 'jupiter') await connectAdapterWallet(method);
       else if (method === 'auto') await generateAutoWallet();
     } catch (e) {
       setLocalError(e.message);
@@ -181,6 +183,8 @@ export default function WalletLogin() {
                 {isConnecting ? <Loader2 className="w-5 h-5 animate-spin text-purple-400" /> : <ArrowRight className="w-5 h-5 text-slate-500" />}
               </button>
 
+              <AdapterWalletOptions onConnect={handleConnect} isConnecting={isConnecting} />
+
               {/* Divider */}
               <div className="flex items-center gap-3 py-2">
                 <div className="flex-1 h-px bg-slate-700" />
@@ -209,7 +213,7 @@ export default function WalletLogin() {
               <div className="mt-6 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-start gap-2">
                 <Globe className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
                 <p className="text-blue-300 text-xs">
-                  Choose your installed wallet and approve the connection in its browser. Continue using VINmint there; the connection does not carry back to Safari or Chrome.
+                  Mobile Wallet Adapter connects compatible wallets from a supported Android browser. Phantom, Solflare, and Backpack open their own browsers; continue using VINmint there.
                 </p>
               </div>
             )}

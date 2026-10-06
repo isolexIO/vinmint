@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Keypair } from '@solana/web3.js';
+import { useUnifiedWallet } from '@jup-ag/wallet-adapter';
+import getAdapterWallet from '@/components/wallet/getAdapterWallet';
 import mobileWalletConnection, { getInjectedProvider, isMobile } from '@/components/wallet/mobileWalletConnection';
 
 const WalletContext = createContext(null);
 const STORAGE_KEY = 'vinmint_wallet_session';
 
 export function WalletProvider({ children }) {
+  const { wallets: adapterWallets } = useUnifiedWallet();
   const [walletAddress, setWalletAddress] = useState(null);
   const [walletType, setWalletType] = useState(null);
   const [autoKeypair, setAutoKeypair] = useState(null);
@@ -81,6 +84,55 @@ export function WalletProvider({ children }) {
   const connectSolflare = useCallback(() => connectExternalWallet('solflare'), [connectExternalWallet]);
   const connectBackpack = useCallback(() => connectExternalWallet('backpack'), [connectExternalWallet]);
 
+  const connectAdapterWallet = useCallback(async (type) => {
+    setIsConnecting(true);
+    setError(null);
+    try {
+      if (type === 'mwa' && !/Android/i.test(navigator.userAgent)) {
+        throw new Error('Mobile Wallet Adapter requires a supported Android browser and an installed compatible wallet. On iPhone, choose Phantom, Solflare, or Backpack.');
+      }
+      const adapter = getAdapterWallet(adapterWallets, type);
+      if (!adapter || ['NotDetected', 'Unsupported'].includes(adapter.readyState)) {
+        throw new Error(type === 'jupiter'
+          ? 'Install the Jupiter Wallet browser extension, then reload this page to connect. Jupiter Mobile QR connections require a separate WalletConnect setup.'
+          : 'Open VINmint in Chrome on Android with an MWA-compatible wallet installed, then try again.');
+      }
+      await adapter.connect();
+      if (!adapter.publicKey) throw new Error('The wallet did not approve the connection. Please try again.');
+      const address = adapter.publicKey.toString();
+      saveSession(address, type);
+      setAutoKeypair(null);
+      setWalletAddress(address);
+      setWalletType(type);
+    } catch (e) {
+      setError(e.message);
+      throw e;
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [adapterWallets]);
+
+  useEffect(() => {
+    const adapter = getAdapterWallet(adapterWallets, walletType);
+    if (!adapter) return;
+    const handleConnect = (publicKey) => {
+      const address = publicKey.toString();
+      saveSession(address, walletType);
+      setWalletAddress(address);
+    };
+    const handleDisconnect = () => {
+      setWalletAddress(null);
+      setWalletType(null);
+      localStorage.removeItem(STORAGE_KEY);
+    };
+    adapter.on('connect', handleConnect);
+    adapter.on('disconnect', handleDisconnect);
+    return () => {
+      adapter.off('connect', handleConnect);
+      adapter.off('disconnect', handleDisconnect);
+    };
+  }, [adapterWallets, walletType]);
+
   const generateAutoWallet = useCallback(async () => {
     setIsConnecting(true);
     setError(null);
@@ -112,21 +164,28 @@ export function WalletProvider({ children }) {
     }
   }, []);
 
-  const disconnect = useCallback(() => {
-    try {
-      const provider = getInjectedProvider(walletType);
-      if (provider && provider.disconnect) provider.disconnect();
-    } catch (e) {
-      console.error('Disconnect error:', e);
-    }
+  const disconnect = useCallback(async () => {
+    const provider = getAdapterWallet(adapterWallets, walletType) || getInjectedProvider(walletType);
     setWalletAddress(null);
     setWalletType(null);
     setAutoKeypair(null);
     localStorage.removeItem(STORAGE_KEY);
-  }, [walletType]);
+    try {
+      if (provider && provider.disconnect) await provider.disconnect();
+    } catch (e) {
+      console.error('Disconnect error:', e);
+    }
+  }, [walletType, adapterWallets]);
 
   const signMessage = useCallback(async (message) => {
     const encoded = new TextEncoder().encode(message);
+    if (walletType === 'mwa' || walletType === 'jupiter') {
+      const adapter = getAdapterWallet(adapterWallets, walletType);
+      if (!adapter) throw new Error('Reconnect your wallet to sign this message.');
+      if (!adapter.connected) await adapter.connect();
+      if (!adapter.signMessage) throw new Error('This wallet does not support message signing.');
+      return { signature: await adapter.signMessage(encoded), publicKey: adapter.publicKey };
+    }
     if (walletType === 'phantom') {
       const p = getInjectedProvider('phantom');
       if (p) return await p.signMessage(encoded, 'utf8');
@@ -143,7 +202,7 @@ export function WalletProvider({ children }) {
       throw new Error('Message signing is not supported for auto-generated wallets. Connect an external wallet to sign.');
     }
     throw new Error('No wallet connected or signing not supported');
-  }, [walletType, autoKeypair]);
+  }, [walletType, autoKeypair, adapterWallets]);
 
   const value = {
     walletAddress,
@@ -156,6 +215,7 @@ export function WalletProvider({ children }) {
     connectPhantom,
     connectSolflare,
     connectBackpack,
+    connectAdapterWallet,
     generateAutoWallet,
     disconnect,
     signMessage,

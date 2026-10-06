@@ -9,6 +9,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { WalletProvider } from '@/lib/WalletContext';
+import AdapterWalletProvider from '@/components/wallet/AdapterWalletProvider';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import { ThemeProvider } from "next-themes";
 
@@ -61,6 +62,7 @@ function App() {
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <AdapterWalletProvider>
       <WalletProvider>
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
@@ -73,6 +75,7 @@ function App() {
         </QueryClientProvider>
       </AuthProvider>
       </WalletProvider>
+      </AdapterWalletProvider>
     </ThemeProvider>
   )
 }
