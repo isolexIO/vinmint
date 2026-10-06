@@ -32,6 +32,8 @@ export default function TransferBetweenWalletsModal({
   onClose,
   vinmintWallet,
   connectedWallet,
+  vinmintKeypair,
+  canWithdrawFromAccount,
   onSuccess
 }) {
   const { signTransaction } = useWallet();
@@ -66,12 +68,12 @@ export default function TransferBetweenWalletsModal({
 
     setIsSending(true);
     try {
-      if (direction === 'fund') {
-        // Connected -> VINmint: sign client-side with the external wallet
+      const useGeneratedWallet = direction === 'withdraw' && vinmintKeypair?.publicKey.toString() === vinmintWallet;
+      if (direction === 'fund' || useGeneratedWallet) {
         setInfo('Preparing transaction...');
         const connection = new Connection(PUBLIC_RPC, 'confirmed');
-        const fromPubkey = new PublicKey(connectedWallet);
-        const toPubkey = new PublicKey(vinmintWallet);
+        const fromPubkey = new PublicKey(direction === 'fund' ? connectedWallet : vinmintWallet);
+        const toPubkey = new PublicKey(direction === 'fund' ? vinmintWallet : connectedWallet);
         const lamports = Math.floor(solAmount * LAMPORTS_PER_SOL);
 
         const transaction = new Transaction().add(
@@ -81,13 +83,19 @@ export default function TransferBetweenWalletsModal({
         transaction.recentBlockhash = blockhash;
         transaction.feePayer = fromPubkey;
 
-        setInfo('Please approve the transaction in your wallet...');
-        const signed = await signTransaction(transaction);
+        let signed;
+        if (useGeneratedWallet) {
+          transaction.partialSign(vinmintKeypair);
+          signed = transaction;
+        } else {
+          setInfo('Please approve the transaction in your wallet...');
+          signed = await signTransaction(transaction);
+        }
         const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false });
         await connection.confirmTransaction(sig, 'confirmed');
         setInfo(`Funded VINmint wallet. Signature: ${sig}`);
       } else {
-        // VINmint -> Connected: use the backend (sends from the VINmint account wallet)
+        if (!canWithdrawFromAccount) throw new Error('Sign in to the account that owns this VINmint wallet to withdraw.');
         setInfo('Sending from your VINmint wallet...');
         const response = await transferTokens({
           recipientAddress: connectedWallet,
@@ -127,6 +135,7 @@ export default function TransferBetweenWalletsModal({
       <Button
         type="button"
         variant={direction === 'withdraw' ? 'default' : 'outline'}
+        disabled={!canWithdrawFromAccount && !vinmintKeypair}
         onClick={() => setDirection('withdraw')}
         className={direction === 'withdraw' ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white' : 'border-slate-600 text-slate-300'}
       >

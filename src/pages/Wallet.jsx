@@ -3,12 +3,11 @@ import { base44 } from '@/api/base44Client';
 import { useWallet } from '@/lib/WalletContext';
 import getWalletViewProfile from '@/components/wallet/getWalletViewProfile';
 import WalletOnlyNotice from '@/components/wallet/WalletOnlyNotice';
-import { Vehicle } from '@/entities/Vehicle';
-import { ServiceRecord } from '@/entities/ServiceRecord';
+import WalletSwitcher from '@/components/wallet/WalletSwitcher';
+import useSelectedWalletData from '@/components/wallet/useSelectedWalletData';
 import { generateAndSaveWallet } from '@/functions/generateAndSaveWallet.js';
 import { getPrivateKey } from '@/functions/getPrivateKey.js';
-import { getWalletBalance } from '@/functions/getWalletBalance.js';
-import { getSolanaTransactions } from '@/functions/getSolanaTransactions.js';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -65,18 +64,12 @@ const VinTokenLogo = () => (
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export default function WalletPage() {
-    const { walletAddress, autoKeypair, disconnect } = useWallet();
+    const { walletAddress, walletType, autoKeypair, disconnect } = useWallet();
     const [hasAccount, setHasAccount] = useState(false);
     const [accountWallet, setAccountWallet] = useState(null);
     const [user, setUser] = useState(null);
-    const [transactions, setTransactions] = useState([]);
-    const [vinNfts, setVinNfts] = useState([]);
-    const [serviceNfts, setServiceNfts] = useState([]);
-    const [balances, setBalances] = useState({ sol: 0, vin: 0 });
-    const [connectedBalances, setConnectedBalances] = useState({ sol: 0, vin: 0 });
-    const [isConnectedBalanceLoading, setIsConnectedBalanceLoading] = useState(false);
+
     const [prices, setPrices] = useState({ sol: 0, vin: 0.10 });
-    const [isBalanceLoading, setIsBalanceLoading] = useState(false);
     const [isPricesLoading, setIsPricesLoading] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -87,8 +80,22 @@ export default function WalletPage() {
     const [privateKey, setPrivateKey] = useState(null);
     const [isFetchingKey, setIsFetchingKey] = useState(false);
     const [hasErrors, setHasErrors] = useState(false);
-    const [activeWallet, setActiveWallet] = useState('vinmint'); // 'vinmint' | 'connected'
+    const [selectedWallet, setSelectedWallet] = useState('vinmint');
     const [showTransferBetweenModal, setShowTransferBetweenModal] = useState(false);
+    const generatedAddress = autoKeypair?.publicKey.toString() || null;
+    const vinmintWallet = accountWallet || generatedAddress;
+    const connectedWallet = walletType !== 'auto' ? walletAddress : null;
+    const hasTwoWallets = Boolean(vinmintWallet && connectedWallet && vinmintWallet !== connectedWallet);
+    const activeWallet = selectedWallet === 'connected' && hasTwoWallets
+        ? 'connected' : vinmintWallet ? 'vinmint' : 'connected';
+    const activeAddress = activeWallet === 'connected' ? connectedWallet : vinmintWallet;
+    const { balances: displayBalances, transactions, vinNfts, serviceNfts,
+        isBalanceLoading: displayBalanceLoading, isTransactionsLoading, isNftsLoading,
+        hasErrors: hasAssetErrors, refreshTransactions, refreshWalletData
+    } = useSelectedWalletData(isLoading ? null : activeAddress, hasAccount);
+    const canUseAccountWallet = Boolean(hasAccount && accountWallet && activeAddress === accountWallet);
+    const canRevealKey = Boolean(activeAddress && (canUseAccountWallet || generatedAddress === activeAddress));
+    const displayUsdValue = (displayBalances.sol * prices.sol) + (displayBalances.vin * prices.vin);
 
     const fetchPrices = useCallback(async () => {
         setIsPricesLoading(true);
@@ -108,199 +115,57 @@ export default function WalletPage() {
         }
     }, []);
 
-    const fetchBalances = useCallback(async (walletAddress, updateAccount = false) => {
-        if (!walletAddress) return;
-        
-        setIsBalanceLoading(true);
-        try {
-            console.log("Fetching live balances for:", walletAddress);
-            const response = await getWalletBalance({ walletAddress });
-            
-            if (response.data && response.data.success) {
-                const newBalances = {
-                    sol: response.data.solBalance || 0,
-                    vin: response.data.vinTokenBalance || 0
-                };
-                console.log("Setting new balances:", newBalances);
-                setBalances(newBalances);
-
-                if (updateAccount) {
-                    try {
-                        await base44.auth.updateMe({
-                            solana_balance: newBalances.sol,
-                            vin_token_balance: newBalances.vin
-                        });
-                    } catch (updateError) {
-                        console.warn("Failed to update user balances:", updateError);
-                    }
-                }
-            } else {
-                console.error("Balance fetch failed:", response.data?.error);
-                setBalances({ sol: 0, vin: 0 });
-                setHasErrors(true);
-            }
-        } catch (error) {
-            console.error("Error fetching balances:", error);
-            setBalances({ sol: 0, vin: 0 });
-            setHasErrors(true);
-        } finally {
-            setIsBalanceLoading(false);
-        }
-    }, []);
-
-    const fetchConnectedBalances = useCallback(async (address) => {
-        if (!address) return;
-        setIsConnectedBalanceLoading(true);
-        try {
-            const response = await getWalletBalance({ walletAddress: address });
-            if (response.data && response.data.success) {
-                setConnectedBalances({
-                    sol: response.data.solBalance || 0,
-                    vin: response.data.vinTokenBalance || 0
-                });
-            } else {
-                setConnectedBalances({ sol: 0, vin: 0 });
-            }
-        } catch (error) {
-            console.error("Error fetching connected wallet balances:", error);
-            setConnectedBalances({ sol: 0, vin: 0 });
-        } finally {
-            setIsConnectedBalanceLoading(false);
-        }
-    }, []);
-
-    const fetchTransactions = useCallback(async (walletAddress) => {
-        if (!walletAddress) return;
-        
-        try {
-            console.log("Fetching transaction history for:", walletAddress);
-            const response = await getSolanaTransactions({ walletAddress, limit: 10 }); // Reduced limit
-            
-            if (response.data && response.data.success) {
-                const formattedTransactions = response.data.transactions.map(tx => ({
-                    id: tx.signature,
-                    transaction_hash: tx.signature,
-                    sender_wallet: walletAddress,
-                    receiver_wallet: "Multiple",
-                    token_type: "SOL",
-                    amount: Math.abs(tx.balanceChange),
-                    balanceChange: tx.balanceChange,
-                    status: tx.status,
-                    created_date: new Date(tx.blockTime * 1000).toISOString(),
-                    isOnChain: true
-                })).filter(tx => tx.amount > 0);
-                
-                setTransactions(formattedTransactions);
-            } else {
-                console.warn("On-chain transaction fetch failed, using empty array");
-                setTransactions([]);
-            }
-        } catch (error) {
-            console.error("Error fetching transaction history:", error);
-            setTransactions([]);
-            setHasErrors(true);
-        }
-    }, []);
-
     const loadWalletData = useCallback(async () => {
         setIsLoading(true);
         setHasErrors(false);
-        
         try {
             const authenticated = await base44.auth.isAuthenticated();
             const account = authenticated ? await base44.auth.me() : null;
             setHasAccount(Boolean(account));
             setAccountWallet(account?.wallet_address || null);
-            // The VINmint-generated wallet (saved on the account) is "My Wallet".
-            // A connected external wallet is for signing only and does not override it.
-            let address;
-            let userData;
-            if (account) {
-              address = account.wallet_address;
-              userData = { ...account, wallet_address: address };
-            } else {
-              address = walletAddress;
-              userData = getWalletViewProfile(address);
-            }
-            setUser(userData);
-            setVinNfts([]);
-            setServiceNfts([]);
-            
-            if (!userData || !userData.wallet_address) {
-                setIsLoading(false);
-                return;
-            }
-
-            // Load prices first (fastest)
+            const address = account?.wallet_address || generatedAddress || walletAddress;
+            setUser(account ? { ...account, wallet_address: address } : getWalletViewProfile(address));
             await fetchPrices();
-            await delay(500); // Small delay
-
-            // Then load balances
-            await fetchBalances(userData.wallet_address, Boolean(account && account.wallet_address === userData.wallet_address));
-            // Also load the connected external wallet's balance when it differs from the account wallet
-            if (account && walletAddress && account.wallet_address && walletAddress !== account.wallet_address) {
-                fetchConnectedBalances(walletAddress);
-            } else {
-                setConnectedBalances({ sol: 0, vin: 0 });
-            }
-            if (!account) {
-                await fetchTransactions(userData.wallet_address);
-                return;
-            }
-            await delay(1000); // Delay before next batch
-
-            // Load NFT data with error handling
-            try {
-                const vehicles = await Vehicle.filter({ owner_wallet: userData.wallet_address });
-                setVinNfts(vehicles || []);
-            } catch (error) {
-                console.warn("Failed to load vehicles:", error);
-                setVinNfts([]);
-                setHasErrors(true);
-            }
-
-            await delay(500);
-
-            try {
-                const services = await ServiceRecord.filter({ nft_recipient: userData.wallet_address });
-                setServiceNfts(services || []);
-            } catch (error) {
-                console.warn("Failed to load service records:", error);
-                setServiceNfts([]);
-                setHasErrors(true);
-            }
-
-            await delay(500);
-
-            // Finally load transactions (most likely to fail)
-            await fetchTransactions(userData.wallet_address);
-
         } catch (error) {
-            console.error("Error loading wallet data:", error);
-            setUser(getWalletViewProfile(walletAddress));
+            console.error('Error loading wallet data:', error);
+            setHasAccount(false);
+            setAccountWallet(null);
+            setUser(getWalletViewProfile(generatedAddress || walletAddress));
             setHasErrors(true);
         } finally {
             setIsLoading(false);
         }
-    }, [fetchBalances, fetchConnectedBalances, fetchPrices, fetchTransactions, walletAddress]);
+    }, [fetchPrices, generatedAddress, walletAddress]);
+
+    useEffect(() => { loadWalletData(); }, [loadWalletData]);
 
     useEffect(() => {
-        loadWalletData();
-    }, [loadWalletData]);
+        if (isLoading || !canUseAccountWallet || displayBalanceLoading || hasAssetErrors) return;
+        base44.auth.updateMe({ solana_balance: displayBalances.sol, vin_token_balance: displayBalances.vin })
+            .catch(error => console.warn('Failed to update user balances:', error));
+    }, [isLoading, canUseAccountWallet, displayBalanceLoading, hasAssetErrors, displayBalances.sol, displayBalances.vin]);
 
-    // When viewing the connected wallet, load its on-chain transaction history on demand.
-    useEffect(() => {
-        if (activeWallet === 'connected' && walletAddress) {
-            fetchTransactions(walletAddress);
-        }
-    }, [activeWallet, walletAddress, fetchTransactions]);
+    const selectWallet = (selection) => {
+        setShowTransferModal(false);
+        setShowReceiveModal(false);
+        setShowBuyVinModal(false);
+        setShowPrivateKeyModal(false);
+        setPrivateKey(null);
+        setSelectedWallet(selection);
+    };
+
+    const handleWalletActionSuccess = async () => {
+        await refreshWalletData();
+    };
 
     const handleCreateWallet = async () => {
         setIsGenerating(true);
         try {
             await generateAndSaveWallet();
             await delay(2000); // Wait a bit before reloading
+            setSelectedWallet('vinmint');
             await loadWalletData();
+            await refreshWalletData();
         } catch (error) {
             console.error("Error creating wallet:", error);
             alert("Failed to create wallet. Please try again in a moment.");
@@ -315,7 +180,7 @@ export default function WalletPage() {
         setPrivateKey(null);
         
         try {
-            if (autoKeypair?.publicKey.toString() === user?.wallet_address) {
+            if (generatedAddress === activeAddress) {
                 setPrivateKey(Array.from(autoKeypair.secretKey));
                 return;
             }
@@ -384,7 +249,7 @@ export default function WalletPage() {
          );
     }
 
-    if (!user.wallet_address) {
+    if (!activeAddress) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-6">
                 <Card className="bg-slate-800/50 border-purple-500/20 backdrop-blur-xl max-w-md w-full text-center">
@@ -409,25 +274,14 @@ export default function WalletPage() {
         );
     }
 
-    const totalUsdValue = (balances.sol * prices.sol) + (balances.vin * prices.vin);
-    const canUseAccountWallet = hasAccount && accountWallet === user.wallet_address;
-    const canRevealKey = canUseAccountWallet || autoKeypair?.publicKey.toString() === user.wallet_address;
-    // The VINmint wallet is the account-generated wallet used for all purchases.
-    const vinmintWallet = accountWallet || user.wallet_address;
-    const connectedWallet = walletAddress;
-    const hasTwoWallets = vinmintWallet && connectedWallet && vinmintWallet !== connectedWallet;
-    // Active wallet drives the displayed balances, address, and transactions.
-    const activeAddress = activeWallet === 'connected' ? connectedWallet : vinmintWallet;
-    const displayBalances = activeWallet === 'connected' ? connectedBalances : balances;
-    const displayBalanceLoading = activeWallet === 'connected' ? isConnectedBalanceLoading : isBalanceLoading;
-    const displayUsdValue = (displayBalances.sol * prices.sol) + (displayBalances.vin * prices.vin);
+
 
     return (
         <>
             <TransferModal 
                 isOpen={showTransferModal}
                 onClose={() => setShowTransferModal(false)}
-                onTransferSuccess={loadWalletData}
+                onTransferSuccess={handleWalletActionSuccess}
             />
             
             <ReceiveModal
@@ -440,7 +294,7 @@ export default function WalletPage() {
                 isOpen={showBuyVinModal}
                 onClose={() => setShowBuyVinModal(false)}
                 walletAddress={vinmintWallet}
-                onPurchaseSuccess={loadWalletData}
+                onPurchaseSuccess={handleWalletActionSuccess}
             />
 
             <TransferBetweenWalletsModal
@@ -448,7 +302,9 @@ export default function WalletPage() {
                 onClose={() => setShowTransferBetweenModal(false)}
                 vinmintWallet={vinmintWallet}
                 connectedWallet={connectedWallet}
-                onSuccess={loadWalletData}
+                vinmintKeypair={generatedAddress === vinmintWallet ? autoKeypair : null}
+                canWithdrawFromAccount={Boolean(hasAccount && accountWallet === vinmintWallet)}
+                onSuccess={handleWalletActionSuccess}
             />
             
             <Dialog open={showPrivateKeyModal} onOpenChange={setShowPrivateKeyModal}>
@@ -489,7 +345,7 @@ export default function WalletPage() {
                         <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-300 bg-clip-text text-transparent">My Wallet</h1>
                         <p className="text-slate-300 text-lg">Manage your digital assets on the VINmint network.</p>
                         {!hasAccount && <WalletOnlyNotice />}
-                        {hasErrors && (
+                        {(hasErrors || hasAssetErrors) && (
                             <Alert className="bg-yellow-500/10 border-yellow-500/20 text-yellow-300 mt-4">
                                 <AlertTriangle className="h-4 w-4 text-yellow-500" />
                                 <AlertDescription>
@@ -499,42 +355,12 @@ export default function WalletPage() {
                         )}
                     </div>
 
-                    {/* Wallet Switcher */}
-                    {connectedWallet && (
-                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-                            <div className="rounded-xl bg-slate-800/50 border border-purple-500/20 backdrop-blur-xl p-1.5 flex gap-1">
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveWallet('vinmint')}
-                                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                                        activeWallet === 'vinmint'
-                                            ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg'
-                                            : 'text-slate-300 hover:bg-purple-500/10'
-                                    }`}
-                                >
-                                    <WalletIcon className="w-4 h-4" />
-                                    VINmint Wallet
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveWallet('connected')}
-                                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                                        activeWallet === 'connected'
-                                            ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg'
-                                            : 'text-slate-300 hover:bg-purple-500/10'
-                                    }`}
-                                >
-                                    <Zap className="w-4 h-4" />
-                                    Connected Wallet
-                                </button>
-                            </div>
-                            <p className="text-slate-400 text-xs mt-2 text-center">
-                                {hasTwoWallets
-                                    ? 'All purchases are made through your VINmint Wallet. Use "Transfer Between Wallets" to fund it.'
-                                    : 'All purchases are made through your VINmint Wallet.'}
-                            </p>
-                        </motion.div>
-                    )}
+                    <WalletSwitcher
+                        activeWallet={activeWallet} onSelect={selectWallet}
+                        vinmintWallet={vinmintWallet} connectedWallet={connectedWallet}
+                        hasAccount={hasAccount} onCreate={handleCreateWallet} isGenerating={isGenerating}
+                        onSignIn={() => base44.auth.redirectToLogin(window.location.href)}
+                    />
 
                     {/* Wallet Address Card */}
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -591,10 +417,10 @@ export default function WalletPage() {
                           Tokens & Actions
                         </TabsTrigger>
                         <TabsTrigger value="vin_nfts" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white text-slate-300">
-                          VIN NFTs ({hasAccount ? vinNfts.length : '—'})
+                          VIN NFTs ({hasAccount ? (isNftsLoading ? '…' : vinNfts.length) : '—'})
                         </TabsTrigger>
                         <TabsTrigger value="service_nfts" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white text-slate-300">
-                          Service NFTs ({hasAccount ? serviceNfts.length : '—'})
+                          Service NFTs ({hasAccount ? (isNftsLoading ? '…' : serviceNfts.length) : '—'})
                         </TabsTrigger>
                       </TabsList>
 
@@ -691,11 +517,11 @@ export default function WalletPage() {
                                     <p className="text-slate-400 text-sm">Available operations for your wallet</p>
                                 </CardHeader>
                                 <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                   <Button onClick={() => setShowTransferModal(true)} disabled={!canUseAccountWallet} title={!canUseAccountWallet ? 'App-managed transfers require the matching account wallet session.' : undefined} className="bg-gradient-to-r from-purple-600 to-blue-600 text-white h-20 flex-col text-sm gap-1">
+                                   <Button onClick={() => setShowTransferModal(true)} disabled={!canUseAccountWallet} title={!canUseAccountWallet ? 'Select your VINmint account wallet to send tokens here. External wallets send through their own wallet app.' : undefined} className="bg-gradient-to-r from-purple-600 to-blue-600 text-white h-20 flex-col text-sm gap-1">
                                         <ArrowUpCircle className="w-6 h-6" />
                                         Send Tokens
                                     </Button>
-                                    <Button onClick={() => setShowBuyVinModal(true)} disabled={!canUseAccountWallet} title={!canUseAccountWallet ? 'App-managed purchases require the matching account wallet session.' : undefined} className="bg-gradient-to-r from-amber-500 to-orange-600 text-white h-20 flex-col text-sm gap-1 hover:from-amber-400 hover:to-orange-500">
+                                    <Button onClick={() => setShowBuyVinModal(true)} disabled={!canUseAccountWallet} title={!canUseAccountWallet ? 'Select your VINmint account wallet to buy VIN.' : undefined} className="bg-gradient-to-r from-amber-500 to-orange-600 text-white h-20 flex-col text-sm gap-1 hover:from-amber-400 hover:to-orange-500">
                                         <ShoppingCart className="w-6 h-6" />
                                         Buy VIN
                                     </Button>
@@ -723,7 +549,7 @@ export default function WalletPage() {
                                         <Button 
                                             size="sm" 
                                             variant="ghost" 
-                                            onClick={() => fetchTransactions(activeAddress)}
+                                            onClick={refreshTransactions}
                                             className="text-slate-400 hover:text-white"
                                         >
                                             <Repeat className="w-4 h-4" />
@@ -731,7 +557,9 @@ export default function WalletPage() {
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    {transactions.length > 0 ? (
+                                    {isTransactionsLoading ? (
+                                        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-purple-400" aria-label="Loading selected wallet history" /></div>
+                                    ) : transactions.length > 0 ? (
                                         <div className="space-y-3">
                                             {transactions.map(tx => (
                                                 <div key={tx.id || tx.transaction_hash} className="flex justify-between items-center p-3 bg-slate-700/30 rounded-lg">
@@ -785,7 +613,9 @@ export default function WalletPage() {
                         <Card className="bg-slate-800/50 border-purple-500/20 backdrop-blur-xl">
                           <CardHeader><CardTitle className="text-white">My VIN NFTs</CardTitle></CardHeader>
                           <CardContent>
-                            {vinNfts.length > 0 ? (
+                            {isNftsLoading ? (
+                              <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-purple-400" aria-label="Loading selected wallet NFTs" /></div>
+                            ) : vinNfts.length > 0 ? (
                               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {vinNfts.map(nft => (
                                   <Card key={nft.id} className="bg-slate-700/30 border-purple-500/20">
@@ -813,7 +643,9 @@ export default function WalletPage() {
                         <Card className="bg-slate-800/50 border-purple-500/20 backdrop-blur-xl">
                           <CardHeader><CardTitle className="text-white">My Service Record NFTs</CardTitle></CardHeader>
                           <CardContent>
-                            {serviceNfts.length > 0 ? (
+                            {isNftsLoading ? (
+                              <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-purple-400" aria-label="Loading selected wallet service NFTs" /></div>
+                            ) : serviceNfts.length > 0 ? (
                                <div className="space-y-3">
                                 {serviceNfts.map(nft => (
                                   <div key={nft.id} className="p-3 bg-slate-700/30 rounded-lg border border-slate-600">

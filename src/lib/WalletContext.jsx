@@ -6,6 +6,7 @@ import mobileWalletConnection, { getInjectedProvider, isMobile } from '@/compone
 
 const WalletContext = createContext(null);
 const STORAGE_KEY = 'vinmint_wallet_session';
+const GENERATED_STORAGE_KEY = 'vinmint_generated_wallet';
 
 export function WalletProvider({ children }) {
   const { wallets: adapterWallets } = useUnifiedWallet();
@@ -19,6 +20,8 @@ export function WalletProvider({ children }) {
   // Restore session and reconnect trusted external wallets
   useEffect(() => {
     try {
+      const generated = localStorage.getItem(GENERATED_STORAGE_KEY);
+      if (generated) setAutoKeypair(Keypair.fromSecretKey(Uint8Array.from(JSON.parse(generated))));
       const saved = localStorage.getItem(STORAGE_KEY);
       if (!saved) return;
       const session = JSON.parse(saved);
@@ -26,6 +29,8 @@ export function WalletProvider({ children }) {
       setWalletType(session.type);
       if (session.type === 'auto' && session.secretKey) {
         setAutoKeypair(Keypair.fromSecretKey(Uint8Array.from(session.secretKey)));
+        localStorage.setItem(GENERATED_STORAGE_KEY, JSON.stringify(session.secretKey));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ address: session.address, type: session.type }));
       }
       // Reconnect external wallet silently if trusted
       if (session.type === 'phantom') {
@@ -49,7 +54,7 @@ export function WalletProvider({ children }) {
 
   const saveSession = (address, type, secretKey = null) => {
     const session = { address, type };
-    if (secretKey) session.secretKey = secretKey;
+    if (secretKey) localStorage.setItem(GENERATED_STORAGE_KEY, JSON.stringify(secretKey));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   };
 
@@ -104,7 +109,6 @@ export function WalletProvider({ children }) {
       if (!adapter.publicKey) throw new Error('The wallet did not approve the connection. Please try again.');
       const address = adapter.publicKey.toString();
       saveSession(address, type);
-      setAutoKeypair(null);
       setWalletAddress(address);
       setWalletType(type);
     } catch (e) {
@@ -171,7 +175,6 @@ export function WalletProvider({ children }) {
     const provider = getAdapterWallet(adapterWallets, walletType) || getInjectedProvider(walletType);
     setWalletAddress(null);
     setWalletType(null);
-    setAutoKeypair(null);
     localStorage.removeItem(STORAGE_KEY);
     try {
       if (provider && provider.disconnect) await provider.disconnect();
