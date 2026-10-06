@@ -46,6 +46,7 @@ import { motion } from 'framer-motion';
 import TransferModal from '../components/wallet/TransferModal';
 import ReceiveModal from '../components/wallet/ReceiveModal';
 import BuyVinModal from '../components/wallet/BuyVinModal';
+import TransferBetweenWalletsModal from '../components/wallet/TransferBetweenWalletsModal';
 import { format } from 'date-fns';
 
 const SolanaLogo = () => (
@@ -85,6 +86,8 @@ export default function WalletPage() {
     const [privateKey, setPrivateKey] = useState(null);
     const [isFetchingKey, setIsFetchingKey] = useState(false);
     const [hasErrors, setHasErrors] = useState(false);
+    const [activeWallet, setActiveWallet] = useState('vinmint'); // 'vinmint' | 'connected'
+    const [showTransferBetweenModal, setShowTransferBetweenModal] = useState(false);
 
     const fetchPrices = useCallback(async () => {
         setIsPricesLoading(true);
@@ -284,6 +287,13 @@ export default function WalletPage() {
         loadWalletData();
     }, [loadWalletData]);
 
+    // When viewing the connected wallet, load its on-chain transaction history on demand.
+    useEffect(() => {
+        if (activeWallet === 'connected' && connectedWallet) {
+            fetchTransactions(connectedWallet);
+        }
+    }, [activeWallet, connectedWallet, fetchTransactions]);
+
     const handleCreateWallet = async () => {
         setIsGenerating(true);
         try {
@@ -328,8 +338,8 @@ export default function WalletPage() {
     };
 
     const openSolscan = () => {
-        if (user?.wallet_address) {
-            window.open(`https://solscan.io/account/${user.wallet_address}`, '_blank');
+        if (activeAddress) {
+            window.open(`https://solscan.io/account/${activeAddress}`, '_blank');
         }
     };
 
@@ -401,9 +411,15 @@ export default function WalletPage() {
     const totalUsdValue = (balances.sol * prices.sol) + (balances.vin * prices.vin);
     const canUseAccountWallet = hasAccount && accountWallet === user.wallet_address;
     const canRevealKey = canUseAccountWallet || autoKeypair?.publicKey.toString() === user.wallet_address;
-    // Show the connected external wallet's balances alongside the account wallet when they differ
-    const showConnectedWallet = hasAccount && accountWallet && walletAddress && walletAddress !== accountWallet;
-    const connectedUsdValue = (connectedBalances.sol * prices.sol) + (connectedBalances.vin * prices.vin);
+    // The VINmint wallet is the account-generated wallet used for all purchases.
+    const vinmintWallet = accountWallet || user.wallet_address;
+    const connectedWallet = walletAddress;
+    const hasTwoWallets = vinmintWallet && connectedWallet && vinmintWallet !== connectedWallet;
+    // Active wallet drives the displayed balances, address, and transactions.
+    const activeAddress = activeWallet === 'connected' ? connectedWallet : vinmintWallet;
+    const displayBalances = activeWallet === 'connected' ? connectedBalances : balances;
+    const displayBalanceLoading = activeWallet === 'connected' ? isConnectedBalanceLoading : isBalanceLoading;
+    const displayUsdValue = (displayBalances.sol * prices.sol) + (displayBalances.vin * prices.vin);
 
     return (
         <>
@@ -416,14 +432,22 @@ export default function WalletPage() {
             <ReceiveModal
                 isOpen={showReceiveModal}
                 onClose={() => setShowReceiveModal(false)}
-                walletAddress={user.wallet_address}
+                walletAddress={activeAddress}
             />
 
             <BuyVinModal
                 isOpen={showBuyVinModal}
                 onClose={() => setShowBuyVinModal(false)}
-                walletAddress={user.wallet_address}
+                walletAddress={vinmintWallet}
                 onPurchaseSuccess={loadWalletData}
+            />
+
+            <TransferBetweenWalletsModal
+                isOpen={showTransferBetweenModal}
+                onClose={() => setShowTransferBetweenModal(false)}
+                vinmintWallet={vinmintWallet}
+                connectedWallet={connectedWallet}
+                onSuccess={loadWalletData}
             />
             
             <Dialog open={showPrivateKeyModal} onOpenChange={setShowPrivateKeyModal}>
@@ -474,16 +498,53 @@ export default function WalletPage() {
                         )}
                     </div>
 
+                    {/* Wallet Switcher */}
+                    {hasTwoWallets && (
+                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+                            <div className="rounded-xl bg-slate-800/50 border border-purple-500/20 backdrop-blur-xl p-1.5 flex gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveWallet('vinmint')}
+                                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                                        activeWallet === 'vinmint'
+                                            ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg'
+                                            : 'text-slate-300 hover:bg-purple-500/10'
+                                    }`}
+                                >
+                                    <WalletIcon className="w-4 h-4" />
+                                    VINmint Wallet
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveWallet('connected')}
+                                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                                        activeWallet === 'connected'
+                                            ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg'
+                                            : 'text-slate-300 hover:bg-purple-500/10'
+                                    }`}
+                                >
+                                    <Zap className="w-4 h-4" />
+                                    Connected Wallet
+                                </button>
+                            </div>
+                            <p className="text-slate-400 text-xs mt-2 text-center">
+                                All purchases are made through your VINmint Wallet. Use "Transfer Between Wallets" to fund it.
+                            </p>
+                        </motion.div>
+                    )}
+
                     {/* Wallet Address Card */}
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                         <Card className="bg-slate-800/50 border-purple-500/20 backdrop-blur-xl mb-8">
                             <CardContent className="p-4 sm:p-6">
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                     <div className="flex-1 min-w-0">
-                                        <Label className="text-purple-300">Your Solana Wallet Address</Label>
+                                        <Label className="text-purple-300">
+                                            {activeWallet === 'connected' ? 'Connected Wallet Address' : 'Your VINmint Wallet Address'}
+                                        </Label>
                                         <div className="flex items-center gap-3 mt-2">
                                             <WalletIcon className="w-6 h-6 text-purple-400 flex-shrink-0" />
-                                            <p className="text-white font-mono text-xs sm:text-sm md:text-base break-all">{user.wallet_address}</p>
+                                            <p className="text-white font-mono text-xs sm:text-sm md:text-base break-all">{activeAddress}</p>
                                         </div>
                                         
                                         <div className="mt-3 flex items-center gap-2">
@@ -494,7 +555,7 @@ export default function WalletPage() {
                                         </div>
                                     </div>
                                     <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                                        <Button onClick={() => copyToClipboard(user.wallet_address)} variant="ghost" className="flex-1 text-slate-300 hover:bg-purple-500/20 hover:text-white">
+                                        <Button onClick={() => copyToClipboard(activeAddress)} variant="ghost" className="flex-1 text-slate-300 hover:bg-purple-500/20 hover:text-white">
                                             <Copy className="w-4 h-4 mr-2" />
                                             Copy
                                         </Button>
@@ -502,10 +563,12 @@ export default function WalletPage() {
                                             <ExternalLink className="w-4 h-4 mr-2" />
                                             Solscan
                                         </Button>
-                                        <Button onClick={handleShowPrivateKey} disabled={!canRevealKey} variant="destructive" className="flex-1 bg-red-900/50 text-red-300 hover:bg-red-900">
-                                            <KeyRound className="w-4 h-4 mr-2" />
-                                            Key
-                                        </Button>
+                                        {activeWallet === 'vinmint' && (
+                                            <Button onClick={handleShowPrivateKey} disabled={!canRevealKey} variant="destructive" className="flex-1 bg-red-900/50 text-red-300 hover:bg-red-900">
+                                                <KeyRound className="w-4 h-4 mr-2" />
+                                                Key
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             </CardContent>
@@ -531,15 +594,17 @@ export default function WalletPage() {
                         <Card className="bg-slate-800/50 border-purple-500/20 backdrop-blur-xl mb-6">
                             <CardContent className="p-6">
                                 <div className="text-center">
-                                    <h3 className="text-slate-400 text-sm mb-2">Total Portfolio Value</h3>
-                                    {isPricesLoading || isBalanceLoading ? (
+                                    <h3 className="text-slate-400 text-sm mb-2">
+                                        {activeWallet === 'connected' ? 'Connected Wallet Value' : 'VINmint Wallet Value'}
+                                    </h3>
+                                    {isPricesLoading || displayBalanceLoading ? (
                                         <div className="flex items-center justify-center gap-2">
                                             <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
                                             <span className="text-slate-300">Loading...</span>
                                         </div>
                                     ) : (
                                         <p className="text-4xl font-bold text-white mb-1">
-                                            ${totalUsdValue.toFixed(2)}
+                                            ${displayUsdValue.toFixed(2)}
                                         </p>
                                     )}
                                     <p className="text-slate-400 text-xs">Live mainnet prices</p>
@@ -559,7 +624,7 @@ export default function WalletPage() {
                                         <DollarSign className="w-5 h-5 text-green-400" />
                                     </CardHeader>
                                     <CardContent className="pt-0">
-                                        {isBalanceLoading ? (
+                                        {displayBalanceLoading ? (
                                             <div className="flex items-center gap-2">
                                                 <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
                                                 <span className="text-slate-300 text-sm">Loading...</span>
@@ -567,10 +632,10 @@ export default function WalletPage() {
                                         ) : (
                                             <>
                                                 <p className="text-2xl sm:text-3xl font-bold text-white">
-                                                    {balances.sol.toFixed(9)}
+                                                    {displayBalances.sol.toFixed(9)}
                                                 </p>
                                                 <p className="text-slate-400 text-xs sm:text-sm mt-1">
-                                                    {isPricesLoading ? "Loading price..." : `$${(balances.sol * prices.sol).toFixed(2)} USD`}
+                                                    {isPricesLoading ? "Loading price..." : `$${(displayBalances.sol * prices.sol).toFixed(2)} USD`}
                                                 </p>
                                             </>
                                         )}
@@ -587,7 +652,7 @@ export default function WalletPage() {
                                         <DollarSign className="w-5 h-5 text-green-400" />
                                     </CardHeader>
                                     <CardContent className="pt-0">
-                                        {isBalanceLoading ? (
+                                        {displayBalanceLoading ? (
                                             <div className="flex items-center gap-2">
                                                 <Loader2 className="w-4 h-4 text-green-400 animate-spin" />
                                                 <span className="text-slate-300 text-sm">Loading...</span>
@@ -595,13 +660,13 @@ export default function WalletPage() {
                                         ) : (
                                             <>
                                                 <p className="text-2xl sm:text-3xl font-bold text-white">
-                                                    {balances.vin.toLocaleString('en-US', {
+                                                    {displayBalances.vin.toLocaleString('en-US', {
                                                         minimumFractionDigits: 0,
                                                         maximumFractionDigits: 6
                                                     })}
                                                 </p>
                                                 <p className="text-slate-400 text-xs sm:text-sm mt-1">
-                                                    ${(balances.vin * prices.vin).toFixed(2)} USD
+                                                    ${(displayBalances.vin * prices.vin).toFixed(2)} USD
                                                 </p>
                                             </>
                                         )}
@@ -609,48 +674,6 @@ export default function WalletPage() {
                                 </Card>
                             </motion.div>
                         </div>
-
-                        {showConnectedWallet && (
-                            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="mb-6 sm:mb-8">
-                                <Card className="bg-slate-800/50 border-blue-500/30 backdrop-blur-xl">
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="text-white text-sm sm:text-base flex items-center gap-2">
-                                            <WalletIcon className="w-5 h-5 text-blue-400" />
-                                            Connected External Wallet
-                                        </CardTitle>
-                                        <p className="text-slate-400 text-xs font-mono break-all">{walletAddress}</p>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {isConnectedBalanceLoading ? (
-                                            <div className="flex items-center gap-2">
-                                                <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
-                                                <span className="text-slate-300 text-sm">Loading balances...</span>
-                                            </div>
-                                        ) : (
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="p-3 bg-slate-900/50 rounded-lg">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <SolanaLogo />
-                                                        <span className="text-slate-400 text-xs">SOL</span>
-                                                    </div>
-                                                    <p className="text-xl font-bold text-white">{connectedBalances.sol.toFixed(6)}</p>
-                                                    <p className="text-slate-400 text-xs">${(connectedBalances.sol * prices.sol).toFixed(2)} USD</p>
-                                                </div>
-                                                <div className="p-3 bg-slate-900/50 rounded-lg">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <VinTokenLogo />
-                                                        <span className="text-slate-400 text-xs">$VIN</span>
-                                                    </div>
-                                                    <p className="text-xl font-bold text-white">{connectedBalances.vin.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 6 })}</p>
-                                                    <p className="text-slate-400 text-xs">${(connectedBalances.vin * prices.vin).toFixed(2)} USD</p>
-                                                </div>
-                                            </div>
-                                        )}
-                                        <p className="text-slate-500 text-xs mt-3">Total: ${connectedUsdValue.toFixed(2)} USD · View the VIN Vault balance on the Admin Panel.</p>
-                                    </CardContent>
-                                </Card>
-                            </motion.div>
-                        )}
 
                         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
                             <Card className="bg-slate-800/50 border-purple-500/20 backdrop-blur-xl mb-8">
@@ -666,6 +689,10 @@ export default function WalletPage() {
                                     <Button onClick={() => setShowBuyVinModal(true)} disabled={!canUseAccountWallet} title={!canUseAccountWallet ? 'App-managed purchases require the matching account wallet session.' : undefined} className="bg-gradient-to-r from-amber-500 to-orange-600 text-white h-20 flex-col text-sm gap-1 hover:from-amber-400 hover:to-orange-500">
                                         <ShoppingCart className="w-6 h-6" />
                                         Buy VIN
+                                    </Button>
+                                    <Button onClick={() => setShowTransferBetweenModal(true)} disabled={!hasTwoWallets} title={!hasTwoWallets ? 'Connect an external wallet different from your VINmint wallet to transfer between them.' : undefined} className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white h-20 flex-col text-sm gap-1 hover:from-blue-500 hover:to-cyan-500">
+                                        <Repeat className="w-6 h-6" />
+                                        Transfer Between Wallets
                                     </Button>
                                     <Button onClick={openReceiveModal} className="bg-gradient-to-r from-green-600 to-emerald-600 text-white h-20 flex-col text-sm gap-1">
                                         <QrCode className="w-6 h-6" />
@@ -687,7 +714,7 @@ export default function WalletPage() {
                                         <Button 
                                             size="sm" 
                                             variant="ghost" 
-                                            onClick={() => fetchTransactions(user?.wallet_address)}
+                                            onClick={() => fetchTransactions(activeAddress)}
                                             className="text-slate-400 hover:text-white"
                                         >
                                             <Repeat className="w-4 h-4" />
@@ -700,14 +727,14 @@ export default function WalletPage() {
                                             {transactions.map(tx => (
                                                 <div key={tx.id || tx.transaction_hash} className="flex justify-between items-center p-3 bg-slate-700/30 rounded-lg">
                                                     <div className="flex items-center gap-3">
-                                                        {(tx.balanceChange !== undefined && tx.balanceChange < 0) || (tx.sender_wallet === user.wallet_address) ? (
+                                                        {(tx.balanceChange !== undefined && tx.balanceChange < 0) || (tx.sender_wallet === activeAddress) ? (
                                                             <ArrowUpCircle className="w-6 h-6 text-red-400" />
                                                         ) : (
                                                             <ArrowDownCircle className="w-6 h-6 text-green-400" />
                                                         )}
                                                         <div>
                                                             <p className="text-white font-medium">
-                                                                {(tx.balanceChange !== undefined && tx.balanceChange < 0) || (tx.sender_wallet === user.wallet_address) ? 'Sent' : 'Received'} {tx.token_type}
+                                                                {(tx.balanceChange !== undefined && tx.balanceChange < 0) || (tx.sender_wallet === activeAddress) ? 'Sent' : 'Received'} {tx.token_type}
                                                                 {tx.isOnChain && <Badge className="ml-2 bg-green-500/20 text-green-300 text-xs">On-Chain</Badge>}
                                                             </p>
                                                             <p className="text-slate-400 text-xs font-mono">
@@ -726,8 +753,8 @@ export default function WalletPage() {
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
-                                                        <p className={`font-bold ${(tx.balanceChange !== undefined && tx.balanceChange < 0) || (tx.sender_wallet === user.wallet_address) ? 'text-red-400' : 'text-green-400'}`}>
-                                                            {(tx.balanceChange !== undefined && tx.balanceChange < 0) || (tx.sender_wallet === user.wallet_address) ? '-' : '+'} {tx.amount} {tx.token_type}
+                                                        <p className={`font-bold ${(tx.balanceChange !== undefined && tx.balanceChange < 0) || (tx.sender_wallet === activeAddress) ? 'text-red-400' : 'text-green-400'}`}>
+                                                            {(tx.balanceChange !== undefined && tx.balanceChange < 0) || (tx.sender_wallet === activeAddress) ? '-' : '+'} {tx.amount} {tx.token_type}
                                                         </p>
                                                         <p className="text-slate-500 text-xs">{format(new Date(tx.created_date), "MMM d, yyyy")}</p>
                                                     </div>

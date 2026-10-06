@@ -180,6 +180,21 @@ export function WalletProvider({ children }) {
     }
   }, [walletType, adapterWallets]);
 
+  const signTransaction = useCallback(async (transaction) => {
+    if (walletType === 'mwa' || walletType === 'jupiter') {
+      const adapter = getAdapterWallet(adapterWallets, walletType);
+      if (!adapter) throw new Error('Reconnect your wallet to sign this transaction.');
+      if (!adapter.connected) await adapter.connect();
+      if (!adapter.signTransaction) throw new Error('This wallet does not support signing transactions.');
+      return await adapter.signTransaction(transaction);
+    }
+    if (['phantom', 'solflare', 'backpack'].includes(walletType)) {
+      const p = getInjectedProvider(walletType);
+      if (p && p.signTransaction) return await p.signTransaction(transaction);
+    }
+    throw new Error('Transaction signing is not supported for this wallet.');
+  }, [walletType, adapterWallets]);
+
   const signMessage = useCallback(async (message) => {
     const encoded = new TextEncoder().encode(message);
     if (walletType === 'mwa' || walletType === 'jupiter') {
@@ -223,6 +238,7 @@ export function WalletProvider({ children }) {
     generateAutoWallet,
     disconnect,
     signMessage,
+    signTransaction,
   };
 
   return (
