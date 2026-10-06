@@ -26,9 +26,12 @@ export default function WalletSwitcher({ activeWallet, onSelect, vinmintWallet, 
       <div className="text-slate-400 text-xs mt-2 text-center">
         {!vinmintWallet ? (
           <>
-            <p>{hasAccount ? 'Create a VINmint wallet to switch between two wallets.' : 'Sign in to access your account’s VINmint wallet.'}</p>
-            <Button size="sm" variant="link" className="text-purple-300" disabled={isGenerating} onClick={hasAccount ? onCreate : onSignIn}>
-              {hasAccount ? (isGenerating ? 'Creating Wallet...' : 'Create VINmint Wallet') : 'Sign In to VINmint'}
+            <p className="mb-2">{hasAccount ? 'Create a VINmint wallet to switch between two wallets.' : 'Sign in to load the VINmint wallet saved on your account.'}</p>
+            <Button size="sm" disabled={isGenerating} onClick={hasAccount ? onCreate : onSignIn}
+              className={hasAccount
+                ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
+                : 'bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-500 hover:to-blue-500'}>
+              {hasAccount ? (isGenerating ? 'Creating Wallet...' : 'Create VINmint Wallet') : 'Sign In to Access My Wallet'}
             </Button>
           </>
         ) : sameWallet ? (
