@@ -64,6 +64,8 @@ import {
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { motion } from "framer-motion";
 import { createPageUrl } from "@/utils";
+import { useWallet } from "@/lib/WalletContext";
+import { isAdminWallet } from "@/lib/adminWallets";
 import {
   Dialog,
   DialogContent,
@@ -98,6 +100,7 @@ const VinTokenLogoSmall = () => (
 );
 
 export default function AdminPanel() {
+  const { walletAddress } = useWallet();
   const [shops, setShops] = useState([]);
   const [dealers, setDealers] = useState([]);
   const [vehicles, setVehicles] = useState([]);
@@ -319,7 +322,18 @@ export default function AdminPanel() {
 
   const loadData = useCallback(async () => {
     try {
-      const user = await base44.auth.me();
+      let user = null;
+      try {
+        user = await base44.auth.me();
+      } catch {
+        // Wallet-only admin: no email/Google session, but wallet is admin-allowlisted
+        if (isAdminWallet(walletAddress)) {
+          user = { wallet_address: walletAddress, user_type: 'admin', full_name: 'Wallet Admin', email: '' };
+        } else {
+          window.location.href = createPageUrl("CustomerDashboard");
+          return;
+        }
+      }
       setCurrentUser(user);
 
       if (user.user_type !== 'admin') {
@@ -330,32 +344,38 @@ export default function AdminPanel() {
       await loadVaultData(); // Load vault config and balances
       await loadRewardsData();
 
-      const [shopsData, vehiclesData, serviceRecordsData, dealersData, allUsersData, invoicesData] = await Promise.all([
-        CertifiedShop.list("-created_date"),
-        Vehicle.list("-created_date"),
-        ServiceRecord.list("-created_date"),
-        base44.entities.User.filter({ user_type: 'dealer' }, "-created_date"),
-        base44.entities.User.list("-created_date"),
-        Invoice.list("-created_date") // Load actual invoices
-      ]);
+      try {
+        const [shopsData, vehiclesData, serviceRecordsData, dealersData, allUsersData, invoicesData] = await Promise.all([
+          CertifiedShop.list("-created_date"),
+          Vehicle.list("-created_date"),
+          ServiceRecord.list("-created_date"),
+          base44.entities.User.filter({ user_type: 'dealer' }, "-created_date"),
+          base44.entities.User.list("-created_date"),
+          Invoice.list("-created_date") // Load actual invoices
+        ]);
 
-      setShops(shopsData);
-      setVehicles(vehiclesData);
-      setServiceRecords(serviceRecordsData);
-      setDealers(dealersData);
-      setAllUsers(allUsersData);
-      setInvoices(invoicesData); // Set invoices state
+        setShops(shopsData);
+        setVehicles(vehiclesData);
+        setServiceRecords(serviceRecordsData);
+        setDealers(dealersData);
+        setAllUsers(allUsersData);
+        setInvoices(invoicesData); // Set invoices state
 
-      // Calculate real analytics from actual data (without vault balance initially)
-      const analyticsData = calculateRealAnalytics(vehiclesData, serviceRecordsData, allUsersData, invoicesData);
-      setAnalytics(analyticsData);
+        // Calculate real analytics from actual data (without vault balance initially)
+        const analyticsData = calculateRealAnalytics(vehiclesData, serviceRecordsData, allUsersData, invoicesData);
+        setAnalytics(analyticsData);
+      } catch (dataError) {
+        // Wallet-only admins may hit RLS restrictions on private entities.
+        // The panel still loads with whatever data is available.
+        console.error("Error loading admin entity data:", dataError);
+      }
 
     } catch (error) {
       console.error("Error loading admin data:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [loadRewardsData, loadVaultData, calculateRealAnalytics]); // Removed vaultBalances from dependencies
+  }, [loadRewardsData, loadVaultData, calculateRealAnalytics, walletAddress]); // Removed vaultBalances from dependencies
 
   useEffect(() => {
     loadData();
