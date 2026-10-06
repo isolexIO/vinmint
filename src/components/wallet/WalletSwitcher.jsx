@@ -1,11 +1,32 @@
 import React from 'react';
-import { Wallet, Zap } from 'lucide-react';
+import { Wallet, Zap, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 const shorten = address => address ? `${address.slice(0, 4)}...${address.slice(-4)}` : 'Unavailable';
 
 export default function WalletSwitcher({ activeWallet, onSelect, vinmintWallet, connectedWallet, hasAccount, onSignIn, onCreate, isGenerating }) {
+  const navigate = useNavigate();
+
+  // No connected wallet at all: show a connect button on the tab.
+  if (!connectedWallet && !vinmintWallet) {
+    return (
+      <div className="mb-6">
+        <div className="rounded-xl bg-slate-800/50 border border-purple-500/20 backdrop-blur-xl p-6 text-center">
+          <Wallet className="w-8 h-8 text-purple-400 mx-auto mb-3" />
+          <p className="text-slate-300 mb-4">Connect a Solana wallet to generate your VINmint wallet and manage your assets.</p>
+          <Button onClick={() => navigate('/WalletLogin?next=%2FWallet')}
+            className="bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-500 hover:to-blue-500">
+            <Wallet className="w-4 h-4 mr-2" />
+            Connect Wallet
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (!connectedWallet) return null;
+
   const sameWallet = vinmintWallet === connectedWallet;
   const choices = [
     { id: 'vinmint', label: 'VINmint Wallet', address: vinmintWallet, Icon: Wallet, disabled: !vinmintWallet },
@@ -26,12 +47,15 @@ export default function WalletSwitcher({ activeWallet, onSelect, vinmintWallet, 
       <div className="text-slate-400 text-xs mt-2 text-center">
         {!vinmintWallet ? (
           <>
-            <p className="mb-2">{hasAccount ? 'Create a VINmint wallet to switch between two wallets.' : 'Sign in to load the VINmint wallet saved on your account.'}</p>
-            <Button size="sm" disabled={isGenerating} onClick={hasAccount ? onCreate : onSignIn}
-              className={hasAccount
-                ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
-                : 'bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-500 hover:to-blue-500'}>
-              {hasAccount ? (isGenerating ? 'Creating Wallet...' : 'Create VINmint Wallet') : 'Sign In to Access My Wallet'}
+            <p className="mb-2">
+              {hasAccount
+                ? 'Create a VINmint wallet to switch between two wallets.'
+                : 'Generate a VINmint wallet on this device, no email or Google sign-in required.'}
+            </p>
+            <Button size="sm" disabled={isGenerating} onClick={onCreate}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-500 hover:to-blue-500">
+              <PlusCircle className="w-4 h-4 mr-2" />
+              {isGenerating ? 'Creating Wallet...' : 'Create VINmint Wallet'}
             </Button>
           </>
         ) : sameWallet ? (

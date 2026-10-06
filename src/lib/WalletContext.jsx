@@ -160,16 +160,21 @@ export function WalletProvider({ children }) {
       }
       const address = keypair.publicKey.toString();
       setAutoKeypair(keypair);
-      setWalletAddress(address);
-      setWalletType('auto');
-      saveSession(address, 'auto', Array.from(keypair.secretKey));
+      // Persist the generated keypair independently so it survives reloads.
+      localStorage.setItem(GENERATED_STORAGE_KEY, JSON.stringify(Array.from(keypair.secretKey)));
+      // Only switch the active session to the auto wallet when no external wallet is connected.
+      if (!walletAddress) {
+        setWalletAddress(address);
+        setWalletType('auto');
+        saveSession(address, 'auto', Array.from(keypair.secretKey));
+      }
     } catch (e) {
       setError(e.message);
       throw e;
     } finally {
       setIsConnecting(false);
     }
-  }, []);
+  }, [walletAddress]);
 
   const disconnect = useCallback(async () => {
     const provider = getAdapterWallet(adapterWallets, walletType) || getInjectedProvider(walletType);

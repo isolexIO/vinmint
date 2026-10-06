@@ -64,7 +64,7 @@ const VinTokenLogo = () => (
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export default function WalletPage() {
-    const { walletAddress, walletType, autoKeypair, disconnect } = useWallet();
+    const { walletAddress, walletType, autoKeypair, disconnect, generateAutoWallet } = useWallet();
     const [hasAccount, setHasAccount] = useState(false);
     const [accountWallet, setAccountWallet] = useState(null);
     const [user, setUser] = useState(null);
@@ -161,8 +161,14 @@ export default function WalletPage() {
     const handleCreateWallet = async () => {
         setIsGenerating(true);
         try {
-            await generateAndSaveWallet();
-            await delay(2000); // Wait a bit before reloading
+            if (hasAccount) {
+                // Account session: generate and persist the wallet server-side.
+                await generateAndSaveWallet();
+                await delay(2000);
+            } else {
+                // No account: generate a local VINmint wallet attached to this device, no sign-in required.
+                await generateAutoWallet();
+            }
             setSelectedWallet('vinmint');
             await loadWalletData();
             await refreshWalletData();
