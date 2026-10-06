@@ -40,7 +40,8 @@ import {
   Zap,
   QrCode,
   DollarSign,
-  ShoppingCart
+  ShoppingCart,
+  LogOut
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import TransferModal from '../components/wallet/TransferModal';
@@ -64,7 +65,7 @@ const VinTokenLogo = () => (
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export default function WalletPage() {
-    const { walletAddress, autoKeypair } = useWallet();
+    const { walletAddress, autoKeypair, disconnect } = useWallet();
     const [hasAccount, setHasAccount] = useState(false);
     const [accountWallet, setAccountWallet] = useState(null);
     const [user, setUser] = useState(null);
@@ -499,7 +500,7 @@ export default function WalletPage() {
                     </div>
 
                     {/* Wallet Switcher */}
-                    {hasTwoWallets && (
+                    {connectedWallet && (
                         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
                             <div className="rounded-xl bg-slate-800/50 border border-purple-500/20 backdrop-blur-xl p-1.5 flex gap-1">
                                 <button
@@ -528,7 +529,9 @@ export default function WalletPage() {
                                 </button>
                             </div>
                             <p className="text-slate-400 text-xs mt-2 text-center">
-                                All purchases are made through your VINmint Wallet. Use "Transfer Between Wallets" to fund it.
+                                {hasTwoWallets
+                                    ? 'All purchases are made through your VINmint Wallet. Use "Transfer Between Wallets" to fund it.'
+                                    : 'All purchases are made through your VINmint Wallet.'}
                             </p>
                         </motion.div>
                     )}
@@ -567,6 +570,12 @@ export default function WalletPage() {
                                             <Button onClick={handleShowPrivateKey} disabled={!canRevealKey} variant="destructive" className="flex-1 bg-red-900/50 text-red-300 hover:bg-red-900">
                                                 <KeyRound className="w-4 h-4 mr-2" />
                                                 Key
+                                            </Button>
+                                        )}
+                                        {connectedWallet && (
+                                            <Button onClick={() => disconnect()} variant="outline" className="flex-1 border-red-500/40 text-red-300 hover:bg-red-500/10 hover:text-red-200">
+                                                <LogOut className="w-4 h-4 mr-2" />
+                                                Disconnect
                                             </Button>
                                         )}
                                     </div>
